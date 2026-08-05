@@ -1,0 +1,6 @@
+proxybans:
+  mode: remote
+
+logging:
+  level:
+    net.vanfek.proxybans: INFO

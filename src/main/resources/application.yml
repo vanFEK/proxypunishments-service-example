@@ -1,0 +1,57 @@
+spring:
+  application:
+    name: proxybans-service
+  liquibase:
+    change-log: classpath:db/changelog/master.xml
+    default-schema: proxybans
+    liquibase-schema: proxybans
+  r2dbc:
+    properties:
+      schema: proxybans
+    pool:
+      initial-size: 4
+      max-size: 32
+      max-idle-time: 30s
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+proxybans:
+  mode: ${PROXYBANS_MODE:local}
+  security:
+    # No default on purpose: an unset token must stop the service from starting rather than
+    # silently disable authentication.
+    service-token: ${PROXYBANS_SERVICE_TOKEN}
+  cache:
+    active-ban-ttl: PT30S
+    lookup-ttl: PT10M
+    max-size: 100000
+  remote:
+    base-url: ${PROXYBANS_REMOTE_BASE_URL:}
+    api-token: ${PROXYBANS_REMOTE_API_TOKEN:}
+    token-header: ${PROXYBANS_REMOTE_TOKEN_HEADER:X-Server-Key}
+    connect-timeout: PT2S
+    read-timeout: PT3S
+    # Endpoint layout of the backend being fronted. {0} is the player UUID or name.
+    paths:
+      active-ban: ${PROXYBANS_REMOTE_PATH_ACTIVE_BAN:/internal/game-bans/{0}}
+      issue-ban: ${PROXYBANS_REMOTE_PATH_ISSUE_BAN:/internal/game-bans}
+      lift-ban: ${PROXYBANS_REMOTE_PATH_LIFT_BAN:/internal/game-bans/{0}/delete}
+      list-bans: ${PROXYBANS_REMOTE_PATH_LIST_BANS:/internal/v1/bans}
+      history: ${PROXYBANS_REMOTE_PATH_HISTORY:/internal/v1/punish-logs/{0}}
+      lookup: ${PROXYBANS_REMOTE_PATH_LOOKUP:/internal/servers/user/{0}}
