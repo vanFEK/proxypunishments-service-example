@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
+
+    <include file="changesets/0001-init-schema.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/0002-create-bans.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/0003-create-ban-history.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/0004-create-known-players.xml" relativeToChangelogFile="true"/>
+</databaseChangeLog>

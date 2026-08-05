@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
+
+    <changeSet id="0004-create-known-players" author="vanfek">
+        <createTable tableName="known_players" schemaName="proxybans">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="login" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="login_lower" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="seen_at" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="known_players" indexName="idx_known_players_login_lower"
+                     schemaName="proxybans" unique="true">
+            <column name="login_lower"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>
