@@ -9,9 +9,7 @@ import java.util.UUID;
 
 @Table("known_players")
 record KnownPlayerRow(
-        @Id @Column("uuid") UUID uuid,
-        @Column("login") String login,
-        @Column("login_lower") String loginLower,
-        @Column("seen_at") Instant seenAt
+        @Id @Column("uuid") UUID uuid, @Column("login") String login,
+        @Column("login_lower") String loginLower, @Column("seen_at") Instant seenAt
 ) {
 }

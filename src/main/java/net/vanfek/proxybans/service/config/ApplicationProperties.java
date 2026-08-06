@@ -7,19 +7,11 @@ import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
 
-/**
- * All tunables in one place.
- *
- * <p>Validated at startup: a blank service token used to mean "accept every request that also sends
- * a blank header", so the application now refuses to start instead.
- */
 @Validated
 @ConfigurationProperties(prefix = "proxybans")
 public record ApplicationProperties(
-        @NotNull Mode mode,
-        @NotNull Security security,
-        @NotNull Cache cache,
-        Remote remote
+        @NotNull Mode mode, @NotNull Security security,
+        @NotNull Cache cache, Remote remote
 ) {
 
     public boolean isLocal() {
@@ -28,14 +20,12 @@ public record ApplicationProperties(
 
     public enum Mode {
 
-        /** Bans live in this service's own Postgres schema. */
         LOCAL,
-
-        /** Bans live behind someone else's HTTP API; this service is a translating proxy. */
         REMOTE
 
     }
 
+    // @NotBlank, not a default: a blank token must fail startup instead of authenticating blank headers.
     public record Security(@NotBlank String serviceToken) {
     }
 
@@ -43,21 +33,14 @@ public record ApplicationProperties(
     }
 
     public record Remote(
-            String baseUrl,
-            String apiToken,
-            String tokenHeader,
-            Duration connectTimeout,
-            Duration readTimeout,
+            String baseUrl, String apiToken, String tokenHeader,
+            Duration connectTimeout, Duration readTimeout,
             Paths paths
     ) {
 
         public record Paths(
-                String activeBan,
-                String issueBan,
-                String liftBan,
-                String listBans,
-                String history,
-                String lookup
+                String activeBan, String issueBan, String liftBan,
+                String listBans, String history, String lookup
         ) {
         }
 

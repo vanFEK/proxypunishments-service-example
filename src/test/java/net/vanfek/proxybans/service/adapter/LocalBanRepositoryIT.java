@@ -24,13 +24,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Exercises the local adapter against a real Postgres, because the parts most likely to break are
- * the parts a fake cannot have: {@code @Modifying} on the deactivation statement, the partial unique
- * index, and the LEFT JOIN that supplies player names.
- *
- * <p>Skipped automatically where Docker is unavailable; CI always runs it.
- */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
         "proxybans.mode=local",

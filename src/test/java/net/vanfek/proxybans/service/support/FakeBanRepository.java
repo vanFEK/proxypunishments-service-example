@@ -18,13 +18,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Hand-written in-memory port implementation.
- *
- * <p>A fake rather than a mock: the caching behaviour under test is about how often the port is
- * called and what it returns, and a fake states that in one readable place instead of spreading it
- * across stubbing calls in every test.
- */
 public final class FakeBanRepository implements BanRepository {
 
     private final Map<UUID, ActiveBan> bans = new HashMap<>();
@@ -56,28 +49,18 @@ public final class FakeBanRepository implements BanRepository {
         Optional<Instant> expiresAt = command.duration().map(now::plus);
 
         ActiveBan ban = new ActiveBan(
-                this.nextId++,
-                command.playerUuid(),
-                Optional.empty(),
-                command.issuedByUuid(),
-                command.issuedByName(),
+                this.nextId++, command.playerUuid(), Optional.empty(),
+                command.issuedByUuid(), command.issuedByName(),
                 command.reason(),
-                now,
-                expiresAt,
+                now, expiresAt,
                 BanType.from(command.isPermanent())
         );
 
         this.bans.put(command.playerUuid(), ban);
         this.log.add(new PunishmentLogEntry(
-                command.playerUuid(),
-                command.issuedByUuid(),
-                command.issuedByName(),
-                command.isPermanent()
-                        ? PunishmentLogEntry.PunishmentAction.PERMBAN
-                        : PunishmentLogEntry.PunishmentAction.BAN,
-                command.reason(),
-                now,
-                expiresAt
+                command.playerUuid(), command.issuedByUuid(), command.issuedByName(),
+                actionOf(command.isPermanent()), command.reason(),
+                now, expiresAt
         ));
 
         return Mono.just(ban);
@@ -87,13 +70,9 @@ public final class FakeBanRepository implements BanRepository {
     public Mono<Void> lift(LiftBanCommand command) {
         this.bans.remove(command.playerUuid());
         this.log.add(new PunishmentLogEntry(
-                command.playerUuid(),
-                command.liftedByUuid(),
-                command.liftedByName(),
-                PunishmentLogEntry.PunishmentAction.UNBAN,
-                command.reason(),
-                this.clock.instant(),
-                Optional.empty()
+                command.playerUuid(), command.liftedByUuid(), command.liftedByName(),
+                PunishmentLogEntry.PunishmentAction.UNBAN, command.reason(),
+                this.clock.instant(), Optional.empty()
         ));
 
         return Mono.empty();
@@ -113,6 +92,12 @@ public final class FakeBanRepository implements BanRepository {
                 .filter(ban -> !ban.isExpired(this.clock.instant()))
                 .skip(offset)
                 .take(limit);
+    }
+
+    private static PunishmentLogEntry.PunishmentAction actionOf(boolean permanent) {
+        return permanent
+                ? PunishmentLogEntry.PunishmentAction.PERMBAN
+                : PunishmentLogEntry.PunishmentAction.BAN;
     }
 
 }

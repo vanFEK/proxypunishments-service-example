@@ -16,13 +16,6 @@ import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Turns exceptions into small, predictable JSON bodies.
- *
- * <p>The catch-all matters as much as the specific handlers: without it an unexpected exception
- * leaves Spring to render its own error page, which can include the exception type and message. That
- * body is read by a Minecraft plugin and, in the worst case, echoed towards a moderator's chat.
- */
 @RestControllerAdvice
 class ApiExceptionHandler {
 

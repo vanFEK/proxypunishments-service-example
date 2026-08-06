@@ -17,10 +17,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The token filter is the only thing standing between the internal API and anyone who can reach the
- * port, so each rule it enforces is pinned down here.
- */
 class SecurityConfigTest {
 
     private static final String TOKEN = "s3cret-token";
@@ -32,10 +28,8 @@ class SecurityConfigTest {
     @BeforeEach
     void setUp() {
         ApplicationProperties properties = new ApplicationProperties(
-                ApplicationProperties.Mode.LOCAL,
-                new ApplicationProperties.Security(TOKEN),
-                new ApplicationProperties.Cache(Duration.ofSeconds(30), Duration.ofMinutes(10), 1000L),
-                null
+                ApplicationProperties.Mode.LOCAL, new ApplicationProperties.Security(TOKEN),
+                new ApplicationProperties.Cache(Duration.ofSeconds(30), Duration.ofMinutes(10), 1000L), null
         );
 
         this.filter = new SecurityConfig().serviceTokenFilter(properties);

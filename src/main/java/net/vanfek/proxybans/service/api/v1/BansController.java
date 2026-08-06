@@ -44,8 +44,7 @@ class BansController {
     @GetMapping
     @Operation(summary = "List currently active bans, newest first")
     Mono<ActiveBansListResponse> list(
-            @RequestParam(defaultValue = "50") int limit,
-            @RequestParam(defaultValue = "0") int offset
+            @RequestParam(defaultValue = "50") int limit, @RequestParam(defaultValue = "0") int offset
     ) {
         Paging paging = new Paging(limit, offset);
 
@@ -69,8 +68,7 @@ class BansController {
     @Operation(summary = "Punishment log for a player, newest first")
     Mono<HistoryResponse> history(
             @PathVariable UUID uuid,
-            @RequestParam(defaultValue = "50") int limit,
-            @RequestParam(defaultValue = "0") int offset
+            @RequestParam(defaultValue = "50") int limit, @RequestParam(defaultValue = "0") int offset
     ) {
         Paging paging = new Paging(limit, offset);
 
@@ -87,10 +85,8 @@ class BansController {
 
         IssueBanCommand command = new IssueBanCommand(
                 request.playerUuid(),
-                request.issuedByUuid(),
-                request.issuedByName(),
-                request.reason(),
-                duration
+                request.issuedByUuid(), request.issuedByName(),
+                request.reason(), duration
         );
 
         return this.bans.issue(command)
@@ -102,9 +98,7 @@ class BansController {
     @Operation(summary = "Lift the active ban for a player")
     Mono<ResponseEntity<Void>> lift(@PathVariable UUID uuid, @Valid @RequestBody LiftBanRequest request) {
         LiftBanCommand command = new LiftBanCommand(
-                uuid,
-                request.liftedByUuid(),
-                request.liftedByName(),
+                uuid, request.liftedByUuid(), request.liftedByName(),
                 Optional.ofNullable(request.reason()).orElse("")
         );
 

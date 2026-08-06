@@ -15,25 +15,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Set;
 
-/**
- * Shared-secret authentication between the proxy plugin and this service.
- *
- * <p>Three details that matter more than the amount of code suggests:
- *
- * <ul>
- *   <li>the comparison is constant time, so the token cannot be recovered one byte at a time;</li>
- *   <li>a blank configured token is rejected at startup by {@link ApplicationProperties}, because
- *       {@code "".equals("")} would otherwise let every unauthenticated caller through;</li>
- *   <li>only {@code /actuator/health} is public. Everything else under {@code /actuator} —
- *       {@code env}, {@code metrics}, {@code prometheus} — needs the token, since those endpoints
- *       describe the internals of the deployment.</li>
- * </ul>
- */
 @Configuration
 class SecurityConfig {
 
     static final String TOKEN_HEADER = "X-Service-Token";
 
+    // Only the health probes are public; /actuator/env, metrics and prometheus still need the token.
     private static final Set<String> PUBLIC_PATHS = Set.of(
             "/actuator/health",
             "/actuator/health/liveness",
@@ -62,6 +49,7 @@ class SecurityConfig {
         };
     }
 
+    // Constant-time comparison, so the token cannot be recovered one byte at a time.
     private static boolean matches(String provided, byte[] expected) {
         return MessageDigest.isEqual(provided.getBytes(StandardCharsets.UTF_8), expected);
     }

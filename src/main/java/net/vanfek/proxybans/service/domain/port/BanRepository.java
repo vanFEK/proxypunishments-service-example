@@ -9,10 +9,6 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
-/**
- * The single seam between the domain and whatever actually stores bans — the local Postgres schema
- * or a remote HTTP backend. Swapping one for the other is a configuration change, not a code change.
- */
 public interface BanRepository {
 
     Mono<ActiveBan> findActive(UUID playerUuid);

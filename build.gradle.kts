@@ -26,7 +26,7 @@ dependencies {
     implementation("io.r2dbc:r2dbc-pool")
     implementation("org.postgresql:r2dbc-postgresql")
 
-    // JDBC driver is required by Liquibase only; the application itself never opens a blocking connection.
+    // Runtime-only: the JDBC driver is for Liquibase, the application itself stays fully reactive.
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.liquibase:liquibase-core")
 

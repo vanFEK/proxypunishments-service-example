@@ -30,16 +30,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Reads and writes bans through an external HTTP backend.
- *
- * <p>This is the second implementation that justifies the port: the proxy plugin cannot tell whether
- * a ban came from the local Postgres schema or from a website's own database, and switching between
- * them is one environment variable.
- *
- * <p>Endpoint paths are configuration, not constants, so a new backend usually needs a YAML change
- * rather than a new adapter.
- */
 @Repository
 @ConditionalOnProperty(name = "proxybans.mode", havingValue = "remote")
 class RemoteBanRepository implements BanRepository {
@@ -76,8 +66,7 @@ class RemoteBanRepository implements BanRepository {
 
         CreateBanRequest payload = new CreateBanRequest(
                 command.playerUuid().toString(),
-                command.issuedByUuid().toString(),
-                command.issuedByName(),
+                command.issuedByUuid().toString(), command.issuedByName(),
                 command.reason(),
                 command.duration().map(duration -> now.plus(duration).getEpochSecond()).orElse(null)
         );
@@ -94,9 +83,7 @@ class RemoteBanRepository implements BanRepository {
     @Override
     public Mono<Void> lift(LiftBanCommand command) {
         LiftBanRequest payload = new LiftBanRequest(
-                command.liftedByUuid().toString(),
-                command.liftedByName(),
-                command.reason()
+                command.liftedByUuid().toString(), command.liftedByName(), command.reason()
         );
 
         return this.client.post()
@@ -168,13 +155,10 @@ class RemoteBanRepository implements BanRepository {
 
         return new ActiveBan(
                 payload.id() != null ? payload.id() : 0L,
-                parseUuidOrNil(banned != null ? banned.uuid() : null),
-                Optional.ofNullable(banned != null ? banned.login() : null),
-                parseUuidOrNil(punisher != null ? punisher.uuid() : null),
-                loginOrDefault(punisher),
+                parseUuidOrNil(banned != null ? banned.uuid() : null), Optional.ofNullable(banned != null ? banned.login() : null),
+                parseUuidOrNil(punisher != null ? punisher.uuid() : null), loginOrDefault(punisher),
                 payload.reason() != null ? payload.reason() : "",
-                Instant.ofEpochSecond(payload.timeStart() != null ? payload.timeStart() : 0L),
-                expiresAt,
+                Instant.ofEpochSecond(payload.timeStart() != null ? payload.timeStart() : 0L), expiresAt,
                 BanType.from(permanent)
         );
     }
@@ -189,12 +173,9 @@ class RemoteBanRepository implements BanRepository {
 
         return new PunishmentLogEntry(
                 parseUuidOrNil(banned != null ? banned.uuid() : null),
-                parseUuidOrNil(admin != null ? admin.uuid() : null),
-                loginOrDefault(admin),
-                parseAction(payload.type()),
-                payload.reason() != null ? payload.reason() : "",
-                Instant.ofEpochSecond(payload.time() != null ? payload.time() : 0L),
-                expiresAt
+                parseUuidOrNil(admin != null ? admin.uuid() : null), loginOrDefault(admin),
+                parseAction(payload.type()), payload.reason() != null ? payload.reason() : "",
+                Instant.ofEpochSecond(payload.time() != null ? payload.time() : 0L), expiresAt
         );
     }
 

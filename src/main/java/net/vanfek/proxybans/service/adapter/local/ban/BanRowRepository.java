@@ -20,14 +20,12 @@ interface BanRowRepository extends ReactiveCrudRepository<BanRow, Long> {
             """)
     Mono<BanWithNameRow> findActiveByPlayerUuid(UUID uuid);
 
-    /**
-     * {@code @Modifying} is not optional here: without it Spring Data R2DBC treats the statement as a
-     * query, and the deactivation silently does nothing.
-     */
+    // Without @Modifying, Spring Data R2DBC runs this as a query and the update silently does nothing.
     @Modifying
     @Query("UPDATE proxybans.bans SET active = false WHERE player_uuid = :uuid AND active = true")
     Mono<Long> deactivateAllFor(UUID uuid);
 
+    // Without @Modifying, Spring Data R2DBC runs this as a query and the update silently does nothing.
     @Modifying
     @Query("""
             UPDATE proxybans.bans

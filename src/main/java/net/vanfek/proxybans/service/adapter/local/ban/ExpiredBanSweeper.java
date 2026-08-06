@@ -8,14 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 
-/**
- * Marks expired temporary bans inactive.
- *
- * <p>Reads filter expired bans out anyway, so this is not about correctness of lookups. It is about
- * the {@code bans} table: the partial unique index only covers active rows, so leaving every expired
- * ban flagged active means the index grows without bound and the "one active ban per player"
- * invariant is enforced against rows that no longer mean anything.
- */
+// Exists to keep the partial unique index on active rows meaningful, not for read correctness.
 @Component
 @ConditionalOnProperty(name = "proxybans.mode", havingValue = "local")
 class ExpiredBanSweeper {

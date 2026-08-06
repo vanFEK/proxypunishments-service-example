@@ -16,13 +16,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Application service: caching and cache invalidation around the storage ports.
- *
- * <p>Note that a negative answer ("this player is not banned") is cached as deliberately as a
- * positive one. Most logins are from players who are not banned, so caching only the bans would
- * leave the hot path hitting the database every time.
- */
 @Service
 public class BanService {
 
@@ -32,10 +25,8 @@ public class BanService {
     private final AsyncCache<String, Optional<UserIdentity>> lookupCache;
 
     public BanService(
-            BanRepository bans,
-            UserResolver users,
-            AsyncCache<UUID, Optional<ActiveBan>> activeBanCache,
-            AsyncCache<String, Optional<UserIdentity>> lookupCache
+            BanRepository bans, UserResolver users,
+            AsyncCache<UUID, Optional<ActiveBan>> activeBanCache, AsyncCache<String, Optional<UserIdentity>> lookupCache
     ) {
         this.bans = bans;
         this.users = users;

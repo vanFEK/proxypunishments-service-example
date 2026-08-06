@@ -19,10 +19,6 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Drives the controllers over real HTTP against the real service and in-memory ports, so the wiring
- * under test is the whole request path — binding, validation, error mapping and JSON shape.
- */
 class BansControllerTest {
 
     private static final UUID PLAYER = UUID.fromString("11111111-2222-3333-4444-555555555555");

@@ -20,16 +20,13 @@ final class BanDtos {
 
     record IssueBanRequest(
             @NotNull UUID playerUuid,
-            @NotNull UUID issuedByUuid,
-            @NotBlank @Size(max = 64) String issuedByName,
-            @NotBlank @Size(max = 255) String reason,
-            @Positive Long durationSeconds
+            @NotNull UUID issuedByUuid, @NotBlank @Size(max = 64) String issuedByName,
+            @NotBlank @Size(max = 255) String reason, @Positive Long durationSeconds
     ) {
     }
 
     record LiftBanRequest(
-            @NotNull UUID liftedByUuid,
-            @NotBlank @Size(max = 64) String liftedByName,
+            @NotNull UUID liftedByUuid, @NotBlank @Size(max = 64) String liftedByName,
             @Size(max = 255) String reason
     ) {
     }
@@ -44,27 +41,19 @@ final class BanDtos {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     record ActiveBanResponse(
-            long id,
-            UUID playerUuid,
-            String playerName,
-            UUID issuedByUuid,
-            String issuedByName,
+            long id, UUID playerUuid, String playerName,
+            UUID issuedByUuid, String issuedByName,
             String reason,
-            Instant issuedAt,
-            Instant expiresAt,
+            Instant issuedAt, Instant expiresAt,
             String type
     ) {
 
         static ActiveBanResponse from(ActiveBan ban) {
             return new ActiveBanResponse(
-                    ban.id(),
-                    ban.playerUuid(),
-                    ban.playerName().orElse(null),
-                    ban.issuedByUuid(),
-                    ban.issuedByName(),
+                    ban.id(), ban.playerUuid(), ban.playerName().orElse(null),
+                    ban.issuedByUuid(), ban.issuedByName(),
                     ban.reason(),
-                    ban.issuedAt(),
-                    ban.expiresAt().orElse(null),
+                    ban.issuedAt(), ban.expiresAt().orElse(null),
                     ban.type().name()
             );
         }
@@ -73,24 +62,16 @@ final class BanDtos {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     record HistoryEntryResponse(
-            UUID playerUuid,
-            UUID issuedByUuid,
-            String issuedByName,
-            String action,
-            String reason,
-            Instant happenedAt,
-            Instant expiresAt
+            UUID playerUuid, UUID issuedByUuid, String issuedByName,
+            String action, String reason,
+            Instant happenedAt, Instant expiresAt
     ) {
 
         static HistoryEntryResponse from(PunishmentLogEntry entry) {
             return new HistoryEntryResponse(
-                    entry.playerUuid(),
-                    entry.issuedByUuid(),
-                    entry.issuedByName(),
-                    entry.action().name(),
-                    entry.reason(),
-                    entry.happenedAt(),
-                    entry.expiresAt().orElse(null)
+                    entry.playerUuid(), entry.issuedByUuid(), entry.issuedByName(),
+                    entry.action().name(), entry.reason(),
+                    entry.happenedAt(), entry.expiresAt().orElse(null)
             );
         }
 

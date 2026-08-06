@@ -29,12 +29,7 @@ class LocalUserResolver implements UserResolver {
 
     @Override
     public Mono<Void> remember(UserIdentity identity) {
-        return this.players.upsert(
-                identity.uuid(),
-                identity.login(),
-                identity.loginKey(),
-                this.clock.instant()
-        ).then();
+        return this.players.upsert(identity.uuid(), identity.login(), identity.loginKey(), this.clock.instant()).then();
     }
 
 }

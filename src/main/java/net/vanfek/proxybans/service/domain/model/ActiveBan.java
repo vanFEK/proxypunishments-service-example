@@ -4,20 +4,11 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * A ban that is currently in force.
- *
- * @param playerName last known name of the banned player; absent when the store has never seen them
- */
 public record ActiveBan(
-        long id,
-        UUID playerUuid,
-        Optional<String> playerName,
-        UUID issuedByUuid,
-        String issuedByName,
+        long id, UUID playerUuid, Optional<String> playerName,
+        UUID issuedByUuid, String issuedByName,
         String reason,
-        Instant issuedAt,
-        Optional<Instant> expiresAt,
+        Instant issuedAt, Optional<Instant> expiresAt,
         BanType type
 ) {
 

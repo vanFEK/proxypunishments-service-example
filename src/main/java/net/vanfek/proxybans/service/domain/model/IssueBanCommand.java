@@ -6,10 +6,8 @@ import java.util.UUID;
 
 public record IssueBanCommand(
         UUID playerUuid,
-        UUID issuedByUuid,
-        String issuedByName,
-        String reason,
-        Optional<Duration> duration
+        UUID issuedByUuid, String issuedByName,
+        String reason, Optional<Duration> duration
 ) {
 
     public boolean isPermanent() {

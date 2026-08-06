@@ -31,14 +31,10 @@ class RemoteUserResolver implements UserResolver {
                 .uri(this.lookupPath, login)
                 .retrieve()
                 .bodyToMono(IdentityPayload.class)
-                .mapNotNull(payload -> toIdentity(payload))
+                .mapNotNull(RemoteUserResolver::toIdentity)
                 .onErrorResume(RemoteUserResolver::isMissing, ignored -> Mono.empty());
     }
 
-    /**
-     * A remote backend already knows every player it has an account for, so there is nothing to
-     * record here. Only the local mode needs a name registry of its own.
-     */
     @Override
     public Mono<Void> remember(UserIdentity identity) {
         return Mono.empty();
