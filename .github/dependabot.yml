@@ -1,0 +1,25 @@
+version: 2
+
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      test-dependencies:
+        patterns: ["org.junit*", "org.assertj*", "org.mockito*", "org.testcontainers*", "net.bytebuddy*"]
+      spring:
+        patterns: ["org.springframework*", "io.spring*"]
+      minecraft:
+        patterns: ["com.velocitypowered*", "io.papermc*", "net.luckperms*", "net.kyori*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]

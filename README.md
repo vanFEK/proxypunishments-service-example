@@ -294,10 +294,34 @@ anything.
 
 Integration tests skip automatically where Docker is unavailable and always run in CI.
 
+## Load profile
+
+[`docs/load/`](docs/load/) holds a k6 profile pointed at the one endpoint on a critical path — the
+active-punishment lookup every login waits on — with moderator writes running alongside at a
+realistic trickle, because a write path measured on its own says nothing about how it behaves next
+to the read load that actually exists. It ramps to 800 lookups/s against a UUID pool larger than the
+cache, so a meaningful share of the reads reach PostgreSQL instead of measuring Caffeine.
+
+```bash
+k6 run -e TOKEN=dev-local-token -e HOST=http://localhost:8080 docs/load/punishments.js
+```
+
+The results table in [`docs/load/README.md`](docs/load/README.md) is intentionally empty. Numbers
+are worth nothing unless they come from a real run on known hardware, and a benchmark table invented
+by whoever wrote the script is worse than no table at all.
+
 ## Building
 
 ```bash
 ./gradlew bootJar        # build/libs/proxypunishments-service-1.0.0.jar
+./gradlew build          # the same jar, plus Checkstyle and the tests
 ```
 
 Requires JDK 25. The Gradle wrapper is committed.
+
+Checkstyle is part of `build` and fails it on a style regression. The rules live in
+[`config/checkstyle/checkstyle.xml`](config/checkstyle/checkstyle.xml) and describe the conventions
+the sources already follow — a style check that demands a reformat is a style check nobody runs.
+
+Notable changes are recorded in [`CHANGELOG.md`](CHANGELOG.md). Pushing a `v*` tag runs the release
+workflow, which builds the service and attaches the jar to the GitHub release.
