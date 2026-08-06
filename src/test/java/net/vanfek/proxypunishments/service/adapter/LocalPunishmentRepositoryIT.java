@@ -7,6 +7,9 @@ import net.vanfek.proxypunishments.service.domain.model.LiftPunishmentCommand;
 import net.vanfek.proxypunishments.service.domain.model.PunishmentKind;
 import net.vanfek.proxypunishments.service.domain.model.PunishmentLogEntry;
 import net.vanfek.proxypunishments.service.domain.model.UserIdentity;
+import net.vanfek.proxypunishments.service.domain.model.ip.Alt;
+import net.vanfek.proxypunishments.service.domain.model.ip.IpAddress;
+import net.vanfek.proxypunishments.service.domain.model.ip.LiftIpBanCommand;
 import net.vanfek.proxypunishments.service.domain.port.PunishmentRepository;
 import net.vanfek.proxypunishments.service.domain.port.UserResolver;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +26,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,6 +39,7 @@ class LocalPunishmentRepositoryIT {
 
     private static final UUID PLAYER = UUID.fromString("11111111-2222-3333-4444-555555555555");
     private static final UUID ADMIN = UUID.fromString("99999999-8888-7777-6666-555555555555");
+    private static final AtomicInteger COUNTER = new AtomicInteger();
 
     @Container
     @SuppressWarnings("resource")
@@ -81,7 +86,7 @@ class LocalPunishmentRepositoryIT {
 
         this.punishments.issue(command(player, PunishmentKind.BAN, Optional.empty())).block();
         this.punishments.issue(new IssuePunishmentCommand(
-                player, PunishmentKind.BAN,
+                player, PunishmentKind.BAN, Optional.empty(),
                 ADMIN, "Admin",
                 "second reason", Optional.empty()
         )).block();
@@ -153,7 +158,7 @@ class LocalPunishmentRepositoryIT {
         this.punishments.issue(command(player, PunishmentKind.BAN, Optional.empty())).block();
         this.punishments.issue(command(player, PunishmentKind.MUTE, Optional.empty())).block();
         this.punishments.issue(new IssuePunishmentCommand(
-                player, PunishmentKind.MUTE,
+                player, PunishmentKind.MUTE, Optional.empty(),
                 ADMIN, "Admin",
                 "second mute", Optional.empty()
         )).block();
@@ -227,7 +232,7 @@ class LocalPunishmentRepositoryIT {
     void listActiveJoinsKnownPlayerNames() {
         UUID player = UUID.randomUUID();
 
-        this.users.remember(new UserIdentity(player, "Steve_" + player.toString().substring(0, 6))).block();
+        this.users.remember(new UserIdentity(player, "Steve_" + player.toString().substring(0, 6)), Optional.empty()).block();
         this.punishments.issue(command(player, PunishmentKind.BAN, Optional.empty())).block();
 
         List<ActivePunishment> active = this.punishments.listActive(PunishmentKind.BAN, 100, 0).collectList().block();
@@ -261,13 +266,130 @@ class LocalPunishmentRepositoryIT {
         UUID player = UUID.randomUUID();
         String login = "Notch" + player.toString().substring(0, 6);
 
-        this.users.remember(new UserIdentity(player, login)).block();
+        this.users.remember(new UserIdentity(player, login), Optional.empty()).block();
 
         assertThat(this.users.resolveByLogin(login.toUpperCase(java.util.Locale.ROOT)).block()).isNotNull();
     }
 
+    @Test
+    @DisplayName("an IP ban is stored against the address and read back by it")
+    void storesAndReadsBackAnIpBan() {
+        UUID player = UUID.randomUUID();
+        IpAddress address = address();
+
+        this.punishments.issue(ipBan(player, address, "ban evasion")).block();
+
+        ActivePunishment found = this.punishments.findActiveByIp(address).block();
+
+        assertThat(found).isNotNull();
+        assertThat(found.kind()).isEqualTo(PunishmentKind.IP_BAN);
+        assertThat(found.ipAddress()).contains(address);
+        assertThat(found.reason()).isEqualTo("ban evasion");
+    }
+
+    @Test
+    @DisplayName("the partial unique index is on (ip_address), so re-banning an address replaces the old row")
+    void replacingAnIpBanDeactivatesThePreviousOne() {
+        UUID player = UUID.randomUUID();
+        IpAddress address = address();
+
+        this.punishments.issue(ipBan(player, address, "ban evasion")).block();
+        this.punishments.issue(ipBan(UUID.randomUUID(), address, "second reason")).block();
+
+        ActivePunishment found = this.punishments.findActiveByIp(address).block();
+
+        assertThat(found).isNotNull();
+        assertThat(found.reason()).isEqualTo("second reason");
+    }
+
+    @Test
+    @DisplayName("an IP ban and that player's own ban sit in separate rows and neither hides the other")
+    void anIpBanAndAPlayerBanCoexist() {
+        UUID player = UUID.randomUUID();
+        IpAddress address = address();
+
+        this.punishments.issue(command(player, PunishmentKind.BAN, Optional.empty())).block();
+        this.punishments.issue(ipBan(player, address, "ban evasion")).block();
+
+        ActivePunishment ban = this.punishments.findActive(player, PunishmentKind.BAN).block();
+        ActivePunishment ipBan = this.punishments.findActiveByIp(address).block();
+
+        assertThat(ban).isNotNull();
+        assertThat(ban.ipAddress()).isEmpty();
+        assertThat(ipBan).isNotNull();
+        assertThat(ipBan.id()).isNotEqualTo(ban.id());
+    }
+
+    @Test
+    @DisplayName("lifting an IP ban records UNIPBAN against the player it was raised through")
+    void liftingAnIpBanRemovesItAndRecordsHistory() {
+        UUID player = UUID.randomUUID();
+        IpAddress address = address();
+
+        this.punishments.issue(ipBan(player, address, "ban evasion")).block();
+        this.punishments.liftIpBan(new LiftIpBanCommand(address, ADMIN, "Admin", "appeal accepted")).block();
+
+        assertThat(this.punishments.findActiveByIp(address).block()).isNull();
+
+        List<PunishmentLogEntry> history = this.punishments.history(player, 10, 0).collectList().block();
+
+        assertThat(history).isNotNull();
+        assertThat(history).extracting(PunishmentLogEntry::action)
+                .contains(PunishmentLogEntry.PunishmentAction.UNIPBAN, PunishmentLogEntry.PunishmentAction.PERMIPBAN);
+    }
+
+    @Test
+    @DisplayName("the alt query returns the other accounts from one address, newest first, never the player")
+    void findsAltsFromTheSharedAddress() {
+        UUID player = UUID.randomUUID();
+        UUID alt = UUID.randomUUID();
+        UUID stranger = UUID.randomUUID();
+        IpAddress shared = address();
+
+        this.users.remember(identity(alt, "Alex"), Optional.of(shared)).block();
+        this.users.remember(identity(stranger, "Herobrine"), Optional.of(address())).block();
+        this.users.remember(identity(player, "Steve"), Optional.of(shared)).block();
+
+        List<Alt> alts = this.users.findAlts(player, 50).collectList().block();
+
+        assertThat(alts).isNotNull();
+        assertThat(alts).extracting(Alt::uuid).containsExactly(alt);
+        assertThat(alts).allSatisfy(entry -> assertThat(entry.sharedIp()).isTrue());
+    }
+
+    @Test
+    @DisplayName("a player whose address was never reported has no alts rather than every address-less row")
+    void aPlayerWithoutAnAddressHasNoAlts() {
+        UUID player = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+
+        this.users.remember(identity(player, "Steve"), Optional.empty()).block();
+        this.users.remember(identity(other, "Alex"), Optional.empty()).block();
+
+        assertThat(this.users.findAlts(player, 50).collectList().block()).isEmpty();
+    }
+
+    private static UserIdentity identity(UUID uuid, String prefix) {
+        return new UserIdentity(uuid, prefix + "_" + uuid.toString().substring(0, 6));
+    }
+
+    // Documentation range 198.18.0.0/15, so a real host is never accidentally described as banned.
+    private static IpAddress address() {
+        int host = COUNTER.incrementAndGet();
+
+        return IpAddress.parse("198.18." + (host / 256 % 256) + "." + (host % 256)).orElseThrow();
+    }
+
+    private static IssuePunishmentCommand ipBan(UUID player, IpAddress address, String reason) {
+        return new IssuePunishmentCommand(
+                player, PunishmentKind.IP_BAN, Optional.of(address),
+                ADMIN, "Admin",
+                reason, Optional.empty()
+        );
+    }
+
     private static IssuePunishmentCommand command(UUID player, PunishmentKind kind, Optional<Duration> duration) {
-        return new IssuePunishmentCommand(player, kind, ADMIN, "Admin", "griefing", duration);
+        return new IssuePunishmentCommand(player, kind, Optional.empty(), ADMIN, "Admin", "griefing", duration);
     }
 
     private static LiftPunishmentCommand lift(UUID player, PunishmentKind kind) {

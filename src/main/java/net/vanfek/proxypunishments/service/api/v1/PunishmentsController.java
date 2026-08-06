@@ -14,6 +14,8 @@ import net.vanfek.proxypunishments.service.domain.model.IssuePunishmentCommand;
 import net.vanfek.proxypunishments.service.domain.model.IssueWarningCommand;
 import net.vanfek.proxypunishments.service.domain.model.LiftPunishmentCommand;
 import net.vanfek.proxypunishments.service.domain.model.PunishmentKind;
+import net.vanfek.proxypunishments.service.domain.model.ip.IpAddress;
+import net.vanfek.proxypunishments.service.domain.model.ip.LiftIpBanCommand;
 import net.vanfek.proxypunishments.service.domain.service.PunishmentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
@@ -35,7 +38,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1")
 @Validated
-@Tag(name = "Punishments", description = "Issuing, lifting and reading bans, mutes and warnings")
+@Tag(name = "Punishments", description = "Issuing, lifting and reading bans, mutes, IP bans and warnings")
 class PunishmentsController {
 
     private final PunishmentService punishments;
@@ -70,6 +73,16 @@ class PunishmentsController {
                         .orElseGet(() -> ResponseEntity.notFound().build()));
     }
 
+    @GetMapping("/punishments/ip/{address}/active")
+    @Operation(summary = "The IP ban currently in force for an address, or 404")
+    Mono<ResponseEntity<ActivePunishmentResponse>> activeIpBan(@PathVariable String address) {
+        return this.punishments.activeIpBanFor(IpAddressArgument.required(address))
+                .map(active -> active
+                        .map(ActivePunishmentResponse::from)
+                        .map(ResponseEntity::ok)
+                        .orElseGet(() -> ResponseEntity.notFound().build()));
+    }
+
     @GetMapping("/punishments/{uuid}/history")
     @Operation(summary = "Punishment log for a player, newest first")
     Mono<HistoryResponse> history(
@@ -85,12 +98,17 @@ class PunishmentsController {
     }
 
     @PostMapping("/punishments")
-    @Operation(summary = "Issue a ban or a mute; omit durationSeconds for a permanent one")
+    @Operation(summary = "Issue a ban, a mute or an IP ban; omit durationSeconds for a permanent one")
     Mono<ResponseEntity<ActivePunishmentResponse>> issue(@Valid @RequestBody IssuePunishmentRequest request) {
         Optional<Duration> duration = Optional.ofNullable(request.durationSeconds()).map(Duration::ofSeconds);
+        Optional<IpAddress> ipAddress = IpAddressArgument.optional(request.ipAddress());
+
+        if (request.kind().targetsAddress() && ipAddress.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ipAddress is required when kind is IP_BAN");
+        }
 
         IssuePunishmentCommand command = new IssuePunishmentCommand(
-                request.playerUuid(), request.kind(),
+                request.playerUuid(), request.kind(), ipAddress,
                 request.issuedByUuid(), request.issuedByName(),
                 request.reason(), duration
         );
@@ -114,6 +132,20 @@ class PunishmentsController {
         );
 
         return this.punishments.lift(command).thenReturn(ResponseEntity.noContent().build());
+    }
+
+    @DeleteMapping("/punishments/ip/{address}")
+    @Operation(summary = "Lift the IP ban in force for an address")
+    Mono<ResponseEntity<Void>> liftIpBan(
+            @PathVariable String address,
+            @Valid @RequestBody LiftPunishmentRequest request
+    ) {
+        LiftIpBanCommand command = new LiftIpBanCommand(
+                IpAddressArgument.required(address), request.liftedByUuid(),
+                request.liftedByName(), Optional.ofNullable(request.reason()).orElse("")
+        );
+
+        return this.punishments.liftIpBan(command).thenReturn(ResponseEntity.noContent().build());
     }
 
     @PostMapping("/warnings")

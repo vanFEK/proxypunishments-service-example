@@ -3,14 +3,18 @@ package net.vanfek.proxypunishments.service.adapter.remote;
 import net.vanfek.proxypunishments.service.adapter.remote.RemotePayloads.IdentityPayload;
 import net.vanfek.proxypunishments.service.config.ApplicationProperties;
 import net.vanfek.proxypunishments.service.domain.model.UserIdentity;
+import net.vanfek.proxypunishments.service.domain.model.ip.Alt;
+import net.vanfek.proxypunishments.service.domain.model.ip.IpAddress;
 import net.vanfek.proxypunishments.service.domain.port.UserResolver;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -35,9 +39,15 @@ class RemoteUserResolver implements UserResolver {
                 .onErrorResume(RemoteUserResolver::isMissing, ignored -> Mono.empty());
     }
 
+    // known_players is a local-mode table; a remote backend keeps its own sightings and shares no addresses with us.
     @Override
-    public Mono<Void> remember(UserIdentity identity) {
+    public Mono<Void> remember(UserIdentity identity, Optional<IpAddress> ipAddress) {
         return Mono.empty();
+    }
+
+    @Override
+    public Flux<Alt> findAlts(UUID playerUuid, int limit) {
+        return Flux.empty();
     }
 
     private static UserIdentity toIdentity(IdentityPayload payload) {

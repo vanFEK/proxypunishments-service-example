@@ -29,7 +29,8 @@ class SecurityConfigTest {
     void setUp() {
         ApplicationProperties properties = new ApplicationProperties(
                 ApplicationProperties.Mode.LOCAL, new ApplicationProperties.Security(TOKEN),
-                new ApplicationProperties.Cache(Duration.ofSeconds(30), Duration.ofMinutes(10), 1000L), null
+                new ApplicationProperties.Cache(Duration.ofSeconds(30), Duration.ofMinutes(10), 1000L), null,
+                null, null
         );
 
         this.filter = new SecurityConfig().serviceTokenFilter(properties);

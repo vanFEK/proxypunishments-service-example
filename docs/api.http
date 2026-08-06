@@ -5,19 +5,39 @@
 @host = http://localhost:8080
 @token = dev-local-token
 @player = 11111111-2222-3333-4444-555555555555
+@alt = 22222222-3333-4444-5555-666666666666
 @admin = 99999999-8888-7777-6666-555555555555
+@address = 203.0.113.7
 
 ### Health — the only endpoint that needs no token
 GET {{host}}/actuator/health
 
+### Metrics — everything under the proxypunishments. prefix: punishments issued and lifted by kind,
+### cache hit ratio, repository timings, Redis invalidations published and received, webhook deliveries
+GET {{host}}/actuator/prometheus
+X-Service-Token: {{token}}
+
 ### Register a player so names can be resolved (local mode only)
+### "ip" is optional; it is what makes alt detection possible and is validated as a literal address
 POST {{host}}/api/v1/known-players
 X-Service-Token: {{token}}
 Content-Type: application/json
 
 {
   "uuid": "{{player}}",
-  "login": "Steve"
+  "login": "Steve",
+  "ip": "{{address}}"
+}
+
+### Register a second account seen from the same address
+POST {{host}}/api/v1/known-players
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "uuid": "{{alt}}",
+  "login": "Alex",
+  "ip": "{{address}}"
 }
 
 ### Resolve a name to a UUID
@@ -65,6 +85,35 @@ Content-Type: application/json
   "durationSeconds": 3600
 }
 
+### Issue a permanent IP ban — playerUuid records whose connection triggered it
+POST {{host}}/api/v1/punishments
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "playerUuid": "{{player}}",
+  "kind": "IP_BAN",
+  "ipAddress": "{{address}}",
+  "issuedByUuid": "{{admin}}",
+  "issuedByName": "Admin",
+  "reason": "ban evasion"
+}
+
+### Issue an IP ban against a bare address — playerUuid may be the nil UUID
+POST {{host}}/api/v1/punishments
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "playerUuid": "00000000-0000-0000-0000-000000000000",
+  "kind": "IP_BAN",
+  "ipAddress": "198.51.100.9",
+  "issuedByUuid": "{{admin}}",
+  "issuedByName": "Admin",
+  "reason": "open proxy",
+  "durationSeconds": 604800
+}
+
 ### Record a warning — log only, never active
 POST {{host}}/api/v1/warnings
 X-Service-Token: {{token}}
@@ -93,7 +142,19 @@ X-Service-Token: {{token}}
 GET {{host}}/api/v1/punishments?kind=MUTE&limit=20&offset=0
 X-Service-Token: {{token}}
 
-### Punishment history — bans, mutes and warnings together
+### The IP ban currently in force for an address (404 when the address is clean)
+GET {{host}}/api/v1/punishments/ip/{{address}}/active
+X-Service-Token: {{token}}
+
+### Active IP bans, newest first
+GET {{host}}/api/v1/punishments?kind=IP_BAN&limit=20&offset=0
+X-Service-Token: {{token}}
+
+### Alts — other accounts last seen from this player's address, most recent first
+GET {{host}}/api/v1/players/{{player}}/alts?limit=20
+X-Service-Token: {{token}}
+
+### Punishment history — bans, mutes, IP bans and warnings together
 GET {{host}}/api/v1/punishments/{{player}}/history?limit=20&offset=0
 X-Service-Token: {{token}}
 
@@ -119,6 +180,17 @@ Content-Type: application/json
   "reason": "cooled down"
 }
 
+### Lift the IP ban
+DELETE {{host}}/api/v1/punishments/ip/{{address}}
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "liftedByUuid": "{{admin}}",
+  "liftedByName": "Admin",
+  "reason": "shared connection"
+}
+
 ### Rejected: no token
 GET {{host}}/api/v1/punishments/{{player}}/active
 
@@ -129,3 +201,36 @@ X-Service-Token: {{token}}
 ### Rejected: unknown kind
 GET {{host}}/api/v1/punishments?kind=KICK
 X-Service-Token: {{token}}
+
+### Rejected: IP_BAN without an address
+POST {{host}}/api/v1/punishments
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "playerUuid": "{{player}}",
+  "kind": "IP_BAN",
+  "issuedByUuid": "{{admin}}",
+  "issuedByName": "Admin",
+  "reason": "ban evasion"
+}
+
+### Rejected: the address is not an address
+GET {{host}}/api/v1/punishments/ip/definitely-not-an-ip/active
+X-Service-Token: {{token}}
+
+### Cross-node invalidation — with proxypunishments.redis.enabled=true this ban is announced on the
+### invalidation channel, so every other service replica and every proxy drops its cached answer at
+### once instead of waiting out its TTL. Watch it with: docker compose exec redis redis-cli \
+###   subscribe proxypunishments.invalidations
+POST {{host}}/api/v1/punishments
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "playerUuid": "{{player}}",
+  "kind": "BAN",
+  "issuedByUuid": "{{admin}}",
+  "issuedByName": "Admin",
+  "reason": "cross-node invalidation demo"
+}

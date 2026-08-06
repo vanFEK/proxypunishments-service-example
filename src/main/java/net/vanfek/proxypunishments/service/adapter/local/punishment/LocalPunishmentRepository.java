@@ -7,6 +7,8 @@ import net.vanfek.proxypunishments.service.domain.model.IssueWarningCommand;
 import net.vanfek.proxypunishments.service.domain.model.LiftPunishmentCommand;
 import net.vanfek.proxypunishments.service.domain.model.PunishmentKind;
 import net.vanfek.proxypunishments.service.domain.model.PunishmentLogEntry;
+import net.vanfek.proxypunishments.service.domain.model.ip.IpAddress;
+import net.vanfek.proxypunishments.service.domain.model.ip.LiftIpBanCommand;
 import net.vanfek.proxypunishments.service.domain.port.PunishmentRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -24,6 +26,8 @@ import java.util.UUID;
 @Repository
 @ConditionalOnProperty(name = "proxypunishments.mode", havingValue = "local")
 class LocalPunishmentRepository implements PunishmentRepository {
+
+    private static final UUID NIL_UUID = new UUID(0L, 0L);
 
     private final PunishmentRowRepository punishments;
     private final PunishmentLogRowRepository logs;
@@ -45,7 +49,16 @@ class LocalPunishmentRepository implements PunishmentRepository {
         Instant now = this.clock.instant();
 
         return this.punishments.findActiveByPlayerUuidAndKind(playerUuid, kind.name())
-                .filter(row -> row.permanent() || row.expiresAt() == null || row.expiresAt().isAfter(now))
+                .filter(row -> isStillInForce(row, now))
+                .map(LocalPunishmentRepository::toDomain);
+    }
+
+    @Override
+    public Mono<ActivePunishment> findActiveByIp(IpAddress ipAddress) {
+        Instant now = this.clock.instant();
+
+        return this.punishments.findActiveIpBan(ipAddress.asText())
+                .filter(row -> isStillInForce(row, now))
                 .map(LocalPunishmentRepository::toDomain);
     }
 
@@ -59,17 +72,29 @@ class LocalPunishmentRepository implements PunishmentRepository {
 
     @Override
     public Mono<Void> lift(LiftPunishmentCommand command) {
-        Instant now = this.clock.instant();
-
         PunishmentLogRow logEntry = new PunishmentLogRow(
                 null, command.playerUuid(),
                 command.liftedByUuid(), command.liftedByName(),
                 command.kind().liftedAction().name(), command.reason(),
-                now, null
+                this.clock.instant(), null
         );
 
         return this.punishments.deactivateAllFor(command.playerUuid(), command.kind().name())
                 .then(this.logs.save(logEntry))
+                .then()
+                .as(this.transactions::transactional);
+    }
+
+    // The log entry is filed against whoever the address was banned through, so the lift shows up in their history.
+    @Override
+    public Mono<Void> liftIpBan(LiftIpBanCommand command) {
+        String address = command.ipAddress().asText();
+
+        return this.punishments.findActiveIpBan(address)
+                .map(PunishmentWithNameRow::playerUuid)
+                .defaultIfEmpty(NIL_UUID)
+                .flatMap(playerUuid -> this.punishments.deactivateAllForIp(address)
+                        .then(this.logs.save(liftLog(command, playerUuid))))
                 .then()
                 .as(this.transactions::transactional);
     }
@@ -117,16 +142,50 @@ class LocalPunishmentRepository implements PunishmentRepository {
                 now, expiresAt
         );
 
-        return this.punishments.deactivateAllFor(command.playerUuid(), command.kind().name())
+        return deactivatePrevious(command)
                 .then(this.punishments.save(row))
+                .flatMap(saved -> attachIpAddress(saved, command))
                 .flatMap(saved -> this.logs.save(logEntry).thenReturn(saved))
-                .map(LocalPunishmentRepository::toDomain);
+                .map(saved -> toDomain(saved, command.ipAddress()));
     }
 
-    private static ActivePunishment toDomain(PunishmentRow row) {
+    private Mono<Long> deactivatePrevious(IssuePunishmentCommand command) {
+        Optional<IpAddress> address = command.ipAddress();
+
+        if (command.kind().targetsAddress() && address.isPresent()) {
+            return this.punishments.deactivateAllForIp(address.get().asText());
+        }
+
+        return this.punishments.deactivateAllFor(command.playerUuid(), command.kind().name());
+    }
+
+    private Mono<PunishmentRow> attachIpAddress(PunishmentRow saved, IssuePunishmentCommand command) {
+        Optional<IpAddress> address = command.ipAddress();
+
+        if (address.isEmpty()) {
+            return Mono.just(saved);
+        }
+
+        return this.punishments.attachIpAddress(saved.id(), address.get().asText()).thenReturn(saved);
+    }
+
+    private PunishmentLogRow liftLog(LiftIpBanCommand command, UUID playerUuid) {
+        return new PunishmentLogRow(
+                null, playerUuid,
+                command.liftedByUuid(), command.liftedByName(),
+                PunishmentLogEntry.PunishmentAction.UNIPBAN.name(), command.reason(),
+                this.clock.instant(), null
+        );
+    }
+
+    private static boolean isStillInForce(PunishmentWithNameRow row, Instant now) {
+        return row.permanent() || row.expiresAt() == null || row.expiresAt().isAfter(now);
+    }
+
+    private static ActivePunishment toDomain(PunishmentRow row, Optional<IpAddress> ipAddress) {
         return new ActivePunishment(
                 row.id(), row.playerUuid(), Optional.empty(),
-                PunishmentKind.valueOf(row.kind()),
+                PunishmentKind.valueOf(row.kind()), ipAddress,
                 row.issuedByUuid(), row.issuedByName(),
                 row.reason(),
                 row.issuedAt(), Optional.ofNullable(row.expiresAt()),
@@ -137,7 +196,7 @@ class LocalPunishmentRepository implements PunishmentRepository {
     private static ActivePunishment toDomain(PunishmentWithNameRow row) {
         return new ActivePunishment(
                 row.id(), row.playerUuid(), Optional.ofNullable(row.playerName()),
-                PunishmentKind.valueOf(row.kind()),
+                PunishmentKind.valueOf(row.kind()), IpAddress.parse(row.ipAddress()),
                 row.issuedByUuid(), row.issuedByName(),
                 row.reason(),
                 row.issuedAt(), Optional.ofNullable(row.expiresAt()),

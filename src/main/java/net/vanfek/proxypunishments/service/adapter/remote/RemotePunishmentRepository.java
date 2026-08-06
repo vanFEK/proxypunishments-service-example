@@ -16,6 +16,8 @@ import net.vanfek.proxypunishments.service.domain.model.IssueWarningCommand;
 import net.vanfek.proxypunishments.service.domain.model.LiftPunishmentCommand;
 import net.vanfek.proxypunishments.service.domain.model.PunishmentKind;
 import net.vanfek.proxypunishments.service.domain.model.PunishmentLogEntry;
+import net.vanfek.proxypunishments.service.domain.model.ip.IpAddress;
+import net.vanfek.proxypunishments.service.domain.model.ip.LiftIpBanCommand;
 import net.vanfek.proxypunishments.service.domain.port.PunishmentRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
@@ -52,7 +54,7 @@ class RemotePunishmentRepository implements PunishmentRepository {
 
     @Override
     public Mono<ActivePunishment> findActive(UUID playerUuid, PunishmentKind kind) {
-        Optional<String> path = pathFor(kind, this.paths.activeBan(), this.paths.activeMute());
+        Optional<String> path = pathFor(kind, this.paths.activeBan(), this.paths.activeMute(), this.paths.activeIpBan());
 
         if (path.isEmpty()) {
             return Mono.empty();
@@ -69,8 +71,29 @@ class RemotePunishmentRepository implements PunishmentRepository {
     }
 
     @Override
+    public Mono<ActivePunishment> findActiveByIp(IpAddress ipAddress) {
+        Optional<String> path = configured(this.paths.activeIpBan());
+
+        if (path.isEmpty()) {
+            return Mono.empty();
+        }
+
+        return this.client.get()
+                .uri(path.get(), ipAddress.asText())
+                .retrieve()
+                .bodyToMono(PunishmentEnvelope.class)
+                .mapNotNull(PunishmentEnvelope::data)
+                .filter(this::isActive)
+                .map(payload -> toDomain(payload, PunishmentKind.IP_BAN))
+                .onErrorResume(RemotePunishmentRepository::isMissing, ignored -> Mono.empty());
+    }
+
+    @Override
     public Mono<ActivePunishment> issue(IssuePunishmentCommand command) {
-        Optional<String> path = pathFor(command.kind(), this.paths.issueBan(), this.paths.issueMute());
+        Optional<String> path = pathFor(
+                command.kind(), this.paths.issueBan(),
+                this.paths.issueMute(), this.paths.issueIpBan()
+        );
 
         if (path.isEmpty()) {
             return Mono.empty();
@@ -96,7 +119,10 @@ class RemotePunishmentRepository implements PunishmentRepository {
 
     @Override
     public Mono<Void> lift(LiftPunishmentCommand command) {
-        Optional<String> path = pathFor(command.kind(), this.paths.liftBan(), this.paths.liftMute());
+        Optional<String> path = pathFor(
+                command.kind(), this.paths.liftBan(),
+                this.paths.liftMute(), this.paths.liftIpBan()
+        );
 
         if (path.isEmpty()) {
             return Mono.empty();
@@ -115,13 +141,33 @@ class RemotePunishmentRepository implements PunishmentRepository {
     }
 
     @Override
+    public Mono<Void> liftIpBan(LiftIpBanCommand command) {
+        Optional<String> path = configured(this.paths.liftIpBan());
+
+        if (path.isEmpty()) {
+            return Mono.empty();
+        }
+
+        LiftPunishmentRequest payload = new LiftPunishmentRequest(
+                command.liftedByUuid().toString(), command.liftedByName(), command.reason()
+        );
+
+        return this.client.post()
+                .uri(path.get(), command.ipAddress().asText())
+                .bodyValue(payload)
+                .retrieve()
+                .toBodilessEntity()
+                .then();
+    }
+
+    @Override
     public Mono<PunishmentLogEntry> warn(IssueWarningCommand command) {
         return Mono.empty();
     }
 
     @Override
     public Flux<ActivePunishment> listActive(PunishmentKind kind, int limit, int offset) {
-        Optional<String> path = pathFor(kind, this.paths.listBans(), this.paths.listMutes());
+        Optional<String> path = pathFor(kind, this.paths.listBans(), this.paths.listMutes(), this.paths.listIpBans());
 
         if (path.isEmpty()) {
             return Flux.empty();
@@ -156,10 +202,16 @@ class RemotePunishmentRepository implements PunishmentRepository {
                 .onErrorResume(RemotePunishmentRepository::isMissing, ignored -> Flux.empty());
     }
 
-    // An unconfigured path is how a ban-only backend says "no such thing here"; callers then see nothing at all.
-    private Optional<String> pathFor(PunishmentKind kind, String banPath, String mutePath) {
-        String path = kind == PunishmentKind.MUTE ? mutePath : banPath;
+    private Optional<String> pathFor(PunishmentKind kind, String banPath, String mutePath, String ipBanPath) {
+        return switch (kind) {
+            case MUTE -> configured(mutePath);
+            case IP_BAN -> configured(ipBanPath);
+            case BAN -> configured(banPath);
+        };
+    }
 
+    // An unconfigured path is how a ban-only backend says "no such thing here"; callers then see nothing at all.
+    private static Optional<String> configured(String path) {
         return path == null || path.isBlank() ? Optional.empty() : Optional.of(path);
     }
 
@@ -194,7 +246,7 @@ class RemotePunishmentRepository implements PunishmentRepository {
         return new ActivePunishment(
                 payload.id() != null ? payload.id() : 0L,
                 parseUuidOrNil(banned != null ? banned.uuid() : null), Optional.ofNullable(banned != null ? banned.login() : null),
-                kind,
+                kind, Optional.empty(),
                 parseUuidOrNil(punisher != null ? punisher.uuid() : null), loginOrDefault(punisher),
                 payload.reason() != null ? payload.reason() : "",
                 Instant.ofEpochSecond(payload.timeStart() != null ? payload.timeStart() : 0L), expiresAt,

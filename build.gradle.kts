@@ -30,6 +30,11 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.liquibase:liquibase-core")
 
+    // Spring Data Redis without the Boot starter: no auto-configuration means nothing at all
+    // happens while proxypunishments.redis.enabled stays false.
+    implementation("org.springframework.data:spring-data-redis")
+    implementation("io.lettuce:lettuce-core")
+
     implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:2.8.13")
@@ -40,6 +45,7 @@ dependencies {
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:r2dbc")
+    testImplementation("org.testcontainers:testcontainers")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

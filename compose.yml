@@ -20,12 +20,25 @@ services:
       timeout: 3s
       retries: 10
 
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   proxypunishments:
     build:
       context: .
       dockerfile: docker/Dockerfile
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: local
@@ -37,6 +50,9 @@ services:
       SPRING_LIQUIBASE_URL: jdbc:postgresql://postgres:5432/proxypunishments
       SPRING_LIQUIBASE_USER: proxypunishments
       SPRING_LIQUIBASE_PASSWORD: proxypunishments
+      # The one switch that turns cross-proxy cache invalidation on; leave it out and nothing changes.
+      PROXYPUNISHMENTS_REDIS_ENABLED: "true"
+      PROXYPUNISHMENTS_REDIS_HOST: redis
     ports:
       - "127.0.0.1:8080:8080"
 

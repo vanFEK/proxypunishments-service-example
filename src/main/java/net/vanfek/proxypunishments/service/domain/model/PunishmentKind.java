@@ -5,18 +5,27 @@ import net.vanfek.proxypunishments.service.domain.model.PunishmentLogEntry.Punis
 public enum PunishmentKind {
 
     BAN,
-    MUTE;
+    MUTE,
+    IP_BAN;
 
     public PunishmentAction issuedAction(boolean permanent) {
-        if (this == MUTE) {
-            return permanent ? PunishmentAction.PERMMUTE : PunishmentAction.MUTE;
-        }
-
-        return permanent ? PunishmentAction.PERMBAN : PunishmentAction.BAN;
+        return switch (this) {
+            case MUTE -> permanent ? PunishmentAction.PERMMUTE : PunishmentAction.MUTE;
+            case IP_BAN -> permanent ? PunishmentAction.PERMIPBAN : PunishmentAction.IPBAN;
+            case BAN -> permanent ? PunishmentAction.PERMBAN : PunishmentAction.BAN;
+        };
     }
 
     public PunishmentAction liftedAction() {
-        return this == MUTE ? PunishmentAction.UNMUTE : PunishmentAction.UNBAN;
+        return switch (this) {
+            case MUTE -> PunishmentAction.UNMUTE;
+            case IP_BAN -> PunishmentAction.UNIPBAN;
+            case BAN -> PunishmentAction.UNBAN;
+        };
+    }
+
+    public boolean targetsAddress() {
+        return this == IP_BAN;
     }
 
 }

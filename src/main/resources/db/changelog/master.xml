@@ -10,4 +10,5 @@
     <include file="changesets/0003-create-ban-history.xml" relativeToChangelogFile="true"/>
     <include file="changesets/0004-create-known-players.xml" relativeToChangelogFile="true"/>
     <include file="changesets/0005-punishments.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/0006-ip-bans.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

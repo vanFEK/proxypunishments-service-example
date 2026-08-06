@@ -41,6 +41,23 @@ proxypunishments:
     active-punishment-ttl: PT30S
     lookup-ttl: PT10M
     max-size: 100000
+  redis:
+    # Off by default: without it a punishment reaches the other proxies within cache.active-ttl,
+    # with it within a round trip. Nothing else changes either way.
+    enabled: ${PROXYPUNISHMENTS_REDIS_ENABLED:false}
+    host: ${PROXYPUNISHMENTS_REDIS_HOST:localhost}
+    port: ${PROXYPUNISHMENTS_REDIS_PORT:6379}
+    username: ${PROXYPUNISHMENTS_REDIS_USERNAME:}
+    password: ${PROXYPUNISHMENTS_REDIS_PASSWORD:}
+    database: ${PROXYPUNISHMENTS_REDIS_DATABASE:0}
+    channel: ${PROXYPUNISHMENTS_REDIS_CHANNEL:proxypunishments.invalidations}
+    connect-timeout: PT2S
+  discord:
+    enabled: ${PROXYPUNISHMENTS_DISCORD_ENABLED:false}
+    webhook-url: ${PROXYPUNISHMENTS_DISCORD_WEBHOOK_URL:}
+    announce-issued: ${PROXYPUNISHMENTS_DISCORD_ANNOUNCE_ISSUED:true}
+    announce-lifted: ${PROXYPUNISHMENTS_DISCORD_ANNOUNCE_LIFTED:true}
+    timeout: PT3S
   remote:
     base-url: ${PROXYPUNISHMENTS_REMOTE_BASE_URL:}
     api-token: ${PROXYPUNISHMENTS_REMOTE_API_TOKEN:}
@@ -59,5 +76,11 @@ proxypunishments:
       issue-mute: ${PROXYPUNISHMENTS_REMOTE_PATH_ISSUE_MUTE:}
       lift-mute: ${PROXYPUNISHMENTS_REMOTE_PATH_LIFT_MUTE:}
       list-mutes: ${PROXYPUNISHMENTS_REMOTE_PATH_LIST_MUTES:}
+      # Blank for the same reason: a backend without IP bans leaves these unset and IP-ban reads and
+      # writes degrade to empty instead of failing.
+      active-ip-ban: ${PROXYPUNISHMENTS_REMOTE_PATH_ACTIVE_IP_BAN:}
+      issue-ip-ban: ${PROXYPUNISHMENTS_REMOTE_PATH_ISSUE_IP_BAN:}
+      lift-ip-ban: ${PROXYPUNISHMENTS_REMOTE_PATH_LIFT_IP_BAN:}
+      list-ip-bans: ${PROXYPUNISHMENTS_REMOTE_PATH_LIST_IP_BANS:}
       history: ${PROXYPUNISHMENTS_REMOTE_PATH_HISTORY:/internal/v1/punish-logs/{0}}
       lookup: ${PROXYPUNISHMENTS_REMOTE_PATH_LOOKUP:/internal/servers/user/{0}}

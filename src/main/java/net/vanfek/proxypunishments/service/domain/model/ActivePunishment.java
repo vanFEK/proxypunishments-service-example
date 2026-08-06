@@ -1,12 +1,14 @@
 package net.vanfek.proxypunishments.service.domain.model;
 
+import net.vanfek.proxypunishments.service.domain.model.ip.IpAddress;
+
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
 public record ActivePunishment(
         long id, UUID playerUuid, Optional<String> playerName,
-        PunishmentKind kind,
+        PunishmentKind kind, Optional<IpAddress> ipAddress,
         UUID issuedByUuid, String issuedByName,
         String reason,
         Instant issuedAt, Optional<Instant> expiresAt,

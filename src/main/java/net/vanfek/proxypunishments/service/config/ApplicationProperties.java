@@ -11,7 +11,8 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "proxypunishments")
 public record ApplicationProperties(
         @NotNull Mode mode, @NotNull Security security,
-        @NotNull Cache cache, Remote remote
+        @NotNull Cache cache, Remote remote,
+        Redis redis, Discord discord
 ) {
 
     public boolean isLocal() {
@@ -32,6 +33,20 @@ public record ApplicationProperties(
     public record Cache(@NotNull Duration activePunishmentTtl, @NotNull Duration lookupTtl, long maxSize) {
     }
 
+    public record Redis(
+            boolean enabled, String host, int port,
+            String username, String password, int database,
+            String channel, Duration connectTimeout
+    ) {
+    }
+
+    public record Discord(
+            boolean enabled, String webhookUrl,
+            boolean announceIssued, boolean announceLifted,
+            Duration timeout
+    ) {
+    }
+
     public record Remote(
             String baseUrl, String apiToken, String tokenHeader,
             Duration connectTimeout, Duration readTimeout,
@@ -43,6 +58,8 @@ public record ApplicationProperties(
                 String liftBan, String listBans,
                 String activeMute, String issueMute,
                 String liftMute, String listMutes,
+                String activeIpBan, String issueIpBan,
+                String liftIpBan, String listIpBans,
                 String history, String lookup
         ) {
         }

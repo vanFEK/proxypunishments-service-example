@@ -18,6 +18,9 @@ public record PunishmentLogEntry(
         MUTE,
         PERMMUTE,
         UNMUTE,
+        IPBAN,
+        PERMIPBAN,
+        UNIPBAN,
         WARN
 
     }

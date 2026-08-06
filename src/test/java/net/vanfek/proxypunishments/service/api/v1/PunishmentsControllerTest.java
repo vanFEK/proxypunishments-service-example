@@ -2,10 +2,15 @@ package net.vanfek.proxypunishments.service.api.v1;
 
 import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import net.vanfek.proxypunishments.service.domain.invalidation.DisabledInvalidationPublisher;
 import net.vanfek.proxypunishments.service.domain.model.ActivePunishment;
 import net.vanfek.proxypunishments.service.domain.model.ActivePunishmentKey;
 import net.vanfek.proxypunishments.service.domain.model.UserIdentity;
+import net.vanfek.proxypunishments.service.domain.model.ip.IpAddress;
+import net.vanfek.proxypunishments.service.domain.notify.DisabledPunishmentAnnouncer;
 import net.vanfek.proxypunishments.service.domain.service.PunishmentService;
+import net.vanfek.proxypunishments.service.metrics.MicrometerPunishmentMetrics;
 import net.vanfek.proxypunishments.service.support.FakePunishmentRepository;
 import net.vanfek.proxypunishments.service.support.FakeUserResolver;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,9 +41,14 @@ class PunishmentsControllerTest {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
         this.punishments = new FakePunishmentRepository(clock);
-        this.users = new FakeUserResolver();
+        this.users = new FakeUserResolver(clock);
 
-        PunishmentService service = new PunishmentService(this.punishments, this.users, punishmentCache(), lookupCache());
+        PunishmentService service = new PunishmentService(
+                this.punishments, this.users,
+                punishmentCache(), ipBanCache(), lookupCache(),
+                new DisabledInvalidationPublisher(), new MicrometerPunishmentMetrics(new SimpleMeterRegistry()),
+                new DisabledPunishmentAnnouncer()
+        );
 
         this.client = WebTestClient
                 .bindToController(new PunishmentsController(service), new LookupController(service))
@@ -370,10 +380,201 @@ class PunishmentsControllerTest {
                 .expectStatus().isNotFound();
     }
 
+    @Test
+    @DisplayName("an IP ban is read back by address and reports the address it covers")
+    void issuesAndReadsBackAnIpBan() {
+        issue("""
+                {
+                  "playerUuid": "11111111-2222-3333-4444-555555555555",
+                  "kind": "IP_BAN",
+                  "ipAddress": "203.0.113.7",
+                  "issuedByUuid": "99999999-8888-7777-6666-555555555555",
+                  "issuedByName": "Admin",
+                  "reason": "ban evasion"
+                }
+                """)
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.kind").isEqualTo("IP_BAN")
+                .jsonPath("$.ipAddress").isEqualTo("203.0.113.7");
+
+        this.client.get().uri("/api/v1/punishments/ip/{address}/active", "203.0.113.7")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.ipAddress").isEqualTo("203.0.113.7")
+                .jsonPath("$.reason").isEqualTo("ban evasion");
+    }
+
+    @Test
+    @DisplayName("an IP ban denies nothing to a player who is not banned themselves")
+    void anIpBanLeavesThePlayerBanUntouched() {
+        issue("""
+                {
+                  "playerUuid": "11111111-2222-3333-4444-555555555555",
+                  "kind": "IP_BAN",
+                  "ipAddress": "203.0.113.7",
+                  "issuedByUuid": "99999999-8888-7777-6666-555555555555",
+                  "issuedByName": "Admin",
+                  "reason": "ban evasion"
+                }
+                """).expectStatus().isCreated();
+
+        this.client.get().uri("/api/v1/punishments/{uuid}/active?kind=BAN", PLAYER)
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    @Test
+    @DisplayName("an IP ban and a player ban coexist and are read back on their own terms")
+    void anIpBanAndAPlayerBanCoexist() {
+        issue("""
+                {
+                  "playerUuid": "11111111-2222-3333-4444-555555555555",
+                  "kind": "BAN",
+                  "issuedByUuid": "99999999-8888-7777-6666-555555555555",
+                  "issuedByName": "Admin",
+                  "reason": "griefing"
+                }
+                """).expectStatus().isCreated();
+
+        issue("""
+                {
+                  "playerUuid": "11111111-2222-3333-4444-555555555555",
+                  "kind": "IP_BAN",
+                  "ipAddress": "203.0.113.7",
+                  "issuedByUuid": "99999999-8888-7777-6666-555555555555",
+                  "issuedByName": "Admin",
+                  "reason": "ban evasion"
+                }
+                """).expectStatus().isCreated();
+
+        this.client.get().uri("/api/v1/punishments/{uuid}/active?kind=BAN", PLAYER)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.reason").isEqualTo("griefing");
+
+        lift("/api/v1/punishments/ip/203.0.113.7").expectStatus().isNoContent();
+
+        this.client.get().uri("/api/v1/punishments/ip/{address}/active", "203.0.113.7")
+                .exchange()
+                .expectStatus().isNotFound();
+
+        this.client.get().uri("/api/v1/punishments/{uuid}/active?kind=BAN", PLAYER)
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    @DisplayName("an IP ban without an address is rejected rather than stored against nothing")
+    void rejectsAnIpBanWithoutAnAddress() {
+        issue("""
+                {
+                  "playerUuid": "11111111-2222-3333-4444-555555555555",
+                  "kind": "IP_BAN",
+                  "issuedByUuid": "99999999-8888-7777-6666-555555555555",
+                  "issuedByName": "Admin",
+                  "reason": "ban evasion"
+                }
+                """).expectStatus().isBadRequest();
+    }
+
+    @Test
+    @DisplayName("garbage in ipAddress is rejected instead of reaching the database")
+    void rejectsAGarbageAddressInTheBody() {
+        issue("""
+                {
+                  "playerUuid": "11111111-2222-3333-4444-555555555555",
+                  "kind": "IP_BAN",
+                  "ipAddress": "not-an-address",
+                  "issuedByUuid": "99999999-8888-7777-6666-555555555555",
+                  "issuedByName": "Admin",
+                  "reason": "ban evasion"
+                }
+                """).expectStatus().isBadRequest();
+
+        issue("""
+                {
+                  "playerUuid": "11111111-2222-3333-4444-555555555555",
+                  "kind": "IP_BAN",
+                  "ipAddress": "999.999.999.999",
+                  "issuedByUuid": "99999999-8888-7777-6666-555555555555",
+                  "issuedByName": "Admin",
+                  "reason": "ban evasion"
+                }
+                """).expectStatus().isBadRequest();
+    }
+
+    @Test
+    @DisplayName("a garbage address in the path is rejected too")
+    void rejectsAGarbageAddressInThePath() {
+        this.client.get().uri("/api/v1/punishments/ip/{address}/active", "definitely-not-an-ip")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    @DisplayName("a known player is recorded with their address and shows up as an alt of their neighbour")
+    void remembersAnAddressAndListsAlts() {
+        remember("11111111-2222-3333-4444-555555555555", "Steve", "203.0.113.7").expectStatus().isNoContent();
+        remember("22222222-3333-4444-5555-666666666666", "Alex", "203.0.113.7").expectStatus().isNoContent();
+
+        this.client.get().uri("/api/v1/players/{uuid}/alts", PLAYER)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.length()").isEqualTo(1)
+                .jsonPath("$.data[0].login").isEqualTo("Alex")
+                .jsonPath("$.data[0].sharedIp").isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("a nonsense address on the known-players endpoint is rejected, not stored")
+    void rejectsAGarbageAddressWhenRememberingAPlayer() {
+        remember("11111111-2222-3333-4444-555555555555", "Steve", "127.0.0.1; DROP TABLE punishments")
+                .expectStatus().isBadRequest();
+
+        remember("11111111-2222-3333-4444-555555555555", "Steve", "localhost")
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    @DisplayName("the address stays optional: a proxy that does not report one is still accepted")
+    void remembersAPlayerWithoutAnAddress() {
+        this.client.post().uri("/api/v1/known-players")
+                .header("Content-Type", "application/json")
+                .bodyValue("""
+                        {
+                          "uuid": "11111111-2222-3333-4444-555555555555",
+                          "login": "Steve"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        this.client.get().uri("/api/v1/lookup?name=steve")
+                .exchange()
+                .expectStatus().isOk();
+    }
+
     private WebTestClient.ResponseSpec issue(String body) {
         return this.client.post().uri("/api/v1/punishments")
                 .header("Content-Type", "application/json")
                 .bodyValue(body)
+                .exchange();
+    }
+
+    private WebTestClient.ResponseSpec remember(String uuid, String login, String ip) {
+        return this.client.post().uri("/api/v1/known-players")
+                .header("Content-Type", "application/json")
+                .bodyValue("""
+                        {
+                          "uuid": "%s",
+                          "login": "%s",
+                          "ip": "%s"
+                        }
+                        """.formatted(uuid, login, ip))
                 .exchange();
     }
 
@@ -392,6 +593,10 @@ class PunishmentsControllerTest {
     }
 
     private static AsyncCache<ActivePunishmentKey, Optional<ActivePunishment>> punishmentCache() {
+        return Caffeine.newBuilder().expireAfterWrite(Duration.ofSeconds(30)).buildAsync();
+    }
+
+    private static AsyncCache<IpAddress, Optional<ActivePunishment>> ipBanCache() {
         return Caffeine.newBuilder().expireAfterWrite(Duration.ofSeconds(30)).buildAsync();
     }
 
