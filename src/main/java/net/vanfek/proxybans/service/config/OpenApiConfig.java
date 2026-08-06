@@ -3,7 +3,6 @@ package net.vanfek.proxybans.service.config;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
-import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
@@ -26,8 +25,7 @@ class OpenApiConfig {
                 .title("ProxyBans Service API")
                 .version("v1")
                 .description("Ban storage and lookup for Minecraft proxies. Every endpoint except "
-                        + "/actuator/health requires the X-Service-Token header.")
-                .license(new License().name("MIT").url("https://opensource.org/licenses/MIT"));
+                        + "/actuator/health requires the X-Service-Token header.");
 
         return new OpenAPI()
                 .info(info)

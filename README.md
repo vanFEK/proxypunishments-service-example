@@ -3,7 +3,6 @@
 [![CI](https://github.com/vanfek/proxybans-service/actions/workflows/ci.yml/badge.svg)](https://github.com/vanfek/proxybans-service/actions/workflows/ci.yml)
 [![Java](https://img.shields.io/badge/Java-25-orange)](https://openjdk.org/projects/jdk/25/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0-brightgreen)](https://spring.io/projects/spring-boot)
-[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 *[Русская версия](README.ru.md)*
 
@@ -161,7 +160,3 @@ Integration tests skip automatically where Docker is unavailable and always run 
 ```
 
 Requires JDK 25. The Gradle wrapper is committed.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
