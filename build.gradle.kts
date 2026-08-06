@@ -45,7 +45,7 @@ dependencies {
 
     implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("io.micrometer:micrometer-registry-prometheus")
-    implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:2.8.13")
+    implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:3.1.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.projectreactor:reactor-test")
