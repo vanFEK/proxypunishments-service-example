@@ -11,3 +11,4 @@ build/
 .env
 *.log
 .DS_Store
+*.tar.gz
