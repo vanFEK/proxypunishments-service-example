@@ -1,0 +1,202 @@
+package net.vanfek.proxybans.service.api.v1;
+
+import com.github.benmanes.caffeine.cache.AsyncCache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import net.vanfek.proxybans.service.domain.model.ActiveBan;
+import net.vanfek.proxybans.service.domain.model.UserIdentity;
+import net.vanfek.proxybans.service.domain.service.BanService;
+import net.vanfek.proxybans.service.support.FakeBanRepository;
+import net.vanfek.proxybans.service.support.FakeUserResolver;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.web.reactive.server.WebTestClient;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Drives the controllers over real HTTP against the real service and in-memory ports, so the wiring
+ * under test is the whole request path — binding, validation, error mapping and JSON shape.
+ */
+class BansControllerTest {
+
+    private static final UUID PLAYER = UUID.fromString("11111111-2222-3333-4444-555555555555");
+    private static final UUID ADMIN = UUID.fromString("99999999-8888-7777-6666-555555555555");
+    private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
+
+    private WebTestClient client;
+    private FakeBanRepository bans;
+    private FakeUserResolver users;
+
+    @BeforeEach
+    void setUp() {
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+
+        this.bans = new FakeBanRepository(clock);
+        this.users = new FakeUserResolver();
+
+        BanService service = new BanService(this.bans, this.users, banCache(), lookupCache());
+
+        this.client = WebTestClient
+                .bindToController(new BansController(service), new LookupController(service))
+                .controllerAdvice(new ApiExceptionHandler(clock))
+                .build();
+    }
+
+    @Test
+    void issuesAndReadsBackAPermanentBan() {
+        issue("""
+                {
+                  "playerUuid": "11111111-2222-3333-4444-555555555555",
+                  "issuedByUuid": "99999999-8888-7777-6666-555555555555",
+                  "issuedByName": "Admin",
+                  "reason": "griefing"
+                }
+                """)
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.type").isEqualTo("PERMANENT")
+                .jsonPath("$.reason").isEqualTo("griefing");
+
+        this.client.get().uri("/api/v1/bans/{uuid}/active", PLAYER)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.playerUuid").isEqualTo(PLAYER.toString());
+    }
+
+    @Test
+    void answers404WhenThePlayerIsNotBanned() {
+        this.client.get().uri("/api/v1/bans/{uuid}/active", PLAYER)
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    @Test
+    @DisplayName("an oversized limit is rejected instead of turning into a full-table read")
+    void rejectsAnOversizedLimit() {
+        this.client.get().uri("/api/v1/bans?limit=1000000")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    @DisplayName("a negative offset is rejected instead of reaching the database")
+    void rejectsANegativeOffset() {
+        this.client.get().uri("/api/v1/bans?offset=-1")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void acceptsPagingInsideTheAllowedRange() {
+        this.client.get().uri("/api/v1/bans?limit=50&offset=0")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data").isArray();
+    }
+
+    @Test
+    void rejectsABanRequestWithoutAReason() {
+        issue("""
+                {
+                  "playerUuid": "11111111-2222-3333-4444-555555555555",
+                  "issuedByUuid": "99999999-8888-7777-6666-555555555555",
+                  "issuedByName": "Admin",
+                  "reason": ""
+                }
+                """)
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errors[0].field").isEqualTo("reason");
+    }
+
+    @Test
+    @DisplayName("a negative duration is rejected rather than stored as an already-expired ban")
+    void rejectsANegativeDuration() {
+        issue("""
+                {
+                  "playerUuid": "11111111-2222-3333-4444-555555555555",
+                  "issuedByUuid": "99999999-8888-7777-6666-555555555555",
+                  "issuedByName": "Admin",
+                  "reason": "griefing",
+                  "durationSeconds": -60
+                }
+                """)
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void liftingABanReturnsNoContentAndClearsTheBan() {
+        issue("""
+                {
+                  "playerUuid": "11111111-2222-3333-4444-555555555555",
+                  "issuedByUuid": "99999999-8888-7777-6666-555555555555",
+                  "issuedByName": "Admin",
+                  "reason": "griefing"
+                }
+                """).expectStatus().isCreated();
+
+        this.client.method(org.springframework.http.HttpMethod.DELETE)
+                .uri("/api/v1/bans/{uuid}", PLAYER)
+                .header("Content-Type", "application/json")
+                .bodyValue("""
+                        {
+                          "liftedByUuid": "99999999-8888-7777-6666-555555555555",
+                          "liftedByName": "Admin",
+                          "reason": "appeal accepted"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        this.client.get().uri("/api/v1/bans/{uuid}/active", PLAYER)
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    @Test
+    void resolvesAKnownPlayerName() {
+        this.users.register(new UserIdentity(PLAYER, "Steve"));
+
+        this.client.get().uri("/api/v1/lookup?name=steve")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.uuid").isEqualTo(PLAYER.toString());
+    }
+
+    @Test
+    void answers404ForAnUnknownName() {
+        this.client.get().uri("/api/v1/lookup?name=nobody")
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    private WebTestClient.ResponseSpec issue(String body) {
+        return this.client.post().uri("/api/v1/bans")
+                .header("Content-Type", "application/json")
+                .bodyValue(body)
+                .exchange();
+    }
+
+    private static AsyncCache<UUID, Optional<ActiveBan>> banCache() {
+        return Caffeine.newBuilder().expireAfterWrite(Duration.ofSeconds(30)).buildAsync();
+    }
+
+    private static AsyncCache<String, Optional<UserIdentity>> lookupCache() {
+        return Caffeine.newBuilder().expireAfterWrite(Duration.ofMinutes(10)).buildAsync();
+    }
+
+    @SuppressWarnings("unused")
+    private UUID adminUuid() {
+        return ADMIN;
+    }
+
+}
