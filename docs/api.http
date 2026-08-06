@@ -1,0 +1,80 @@
+### ProxyBans service — runnable request collection.
+### Works in IntelliJ IDEA and in VS Code with the REST Client extension.
+### Start the stack first: docker compose up --build
+
+@host = http://localhost:8080
+@token = dev-local-token
+@player = 11111111-2222-3333-4444-555555555555
+@admin = 99999999-8888-7777-6666-555555555555
+
+### Health — the only endpoint that needs no token
+GET {{host}}/actuator/health
+
+### Register a player so names can be resolved (local mode only)
+POST {{host}}/api/v1/known-players
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "uuid": "{{player}}",
+  "login": "Steve"
+}
+
+### Resolve a name to a UUID
+GET {{host}}/api/v1/lookup?name=steve
+X-Service-Token: {{token}}
+
+### Issue a permanent ban
+POST {{host}}/api/v1/bans
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "playerUuid": "{{player}}",
+  "issuedByUuid": "{{admin}}",
+  "issuedByName": "Admin",
+  "reason": "griefing spawn"
+}
+
+### Issue a 7-day ban
+POST {{host}}/api/v1/bans
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "playerUuid": "{{player}}",
+  "issuedByUuid": "{{admin}}",
+  "issuedByName": "Admin",
+  "reason": "chat abuse",
+  "durationSeconds": 604800
+}
+
+### The ban currently in force (404 when the player is clean)
+GET {{host}}/api/v1/bans/{{player}}/active
+X-Service-Token: {{token}}
+
+### Active bans, newest first
+GET {{host}}/api/v1/bans?limit=20&offset=0
+X-Service-Token: {{token}}
+
+### Punishment history
+GET {{host}}/api/v1/bans/{{player}}/history?limit=20&offset=0
+X-Service-Token: {{token}}
+
+### Lift the ban
+DELETE {{host}}/api/v1/bans/{{player}}
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "liftedByUuid": "{{admin}}",
+  "liftedByName": "Admin",
+  "reason": "appeal accepted"
+}
+
+### Rejected: no token
+GET {{host}}/api/v1/bans/{{player}}/active
+
+### Rejected: limit above the maximum
+GET {{host}}/api/v1/bans?limit=1000000
+X-Service-Token: {{token}}

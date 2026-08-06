@@ -1,0 +1,44 @@
+# Everything needed to try the service: `docker compose up --build`, then open
+# http://localhost:8080/swagger-ui.html and send the token below as X-Service-Token.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: proxybans
+      POSTGRES_USER: proxybans
+      POSTGRES_PASSWORD: proxybans
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Without this the service starts before Postgres accepts connections and Liquibase
+    # fails on the very first `docker compose up`.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U proxybans -d proxybans"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  proxybans:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      PROXYBANS_MODE: local
+      PROXYBANS_SERVICE_TOKEN: dev-local-token
+      SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/proxybans
+      SPRING_R2DBC_USERNAME: proxybans
+      SPRING_R2DBC_PASSWORD: proxybans
+      SPRING_LIQUIBASE_URL: jdbc:postgresql://postgres:5432/proxybans
+      SPRING_LIQUIBASE_USER: proxybans
+      SPRING_LIQUIBASE_PASSWORD: proxybans
+    ports:
+      - "127.0.0.1:8080:8080"
+
+volumes:
+  pgdata:
