@@ -25,19 +25,48 @@ GET {{host}}/api/v1/lookup?name=steve
 X-Service-Token: {{token}}
 
 ### Issue a permanent ban
-POST {{host}}/api/v1/bans
+POST {{host}}/api/v1/punishments
 X-Service-Token: {{token}}
 Content-Type: application/json
 
 {
   "playerUuid": "{{player}}",
+  "kind": "BAN",
   "issuedByUuid": "{{admin}}",
   "issuedByName": "Admin",
   "reason": "griefing spawn"
 }
 
 ### Issue a 7-day ban
-POST {{host}}/api/v1/bans
+POST {{host}}/api/v1/punishments
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "playerUuid": "{{player}}",
+  "kind": "BAN",
+  "issuedByUuid": "{{admin}}",
+  "issuedByName": "Admin",
+  "reason": "chat abuse",
+  "durationSeconds": 604800
+}
+
+### Issue a 1-hour mute — the ban above stays in force
+POST {{host}}/api/v1/punishments
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "playerUuid": "{{player}}",
+  "kind": "MUTE",
+  "issuedByUuid": "{{admin}}",
+  "issuedByName": "Admin",
+  "reason": "spamming chat",
+  "durationSeconds": 3600
+}
+
+### Record a warning — log only, never active
+POST {{host}}/api/v1/warnings
 X-Service-Token: {{token}}
 Content-Type: application/json
 
@@ -45,24 +74,31 @@ Content-Type: application/json
   "playerUuid": "{{player}}",
   "issuedByUuid": "{{admin}}",
   "issuedByName": "Admin",
-  "reason": "chat abuse",
-  "durationSeconds": 604800
+  "reason": "minor spam"
 }
 
-### The ban currently in force (404 when the player is clean)
-GET {{host}}/api/v1/bans/{{player}}/active
+### The ban currently in force (404 when the player is clean; kind defaults to BAN)
+GET {{host}}/api/v1/punishments/{{player}}/active
+X-Service-Token: {{token}}
+
+### The mute currently in force
+GET {{host}}/api/v1/punishments/{{player}}/active?kind=MUTE
 X-Service-Token: {{token}}
 
 ### Active bans, newest first
-GET {{host}}/api/v1/bans?limit=20&offset=0
+GET {{host}}/api/v1/punishments?kind=BAN&limit=20&offset=0
 X-Service-Token: {{token}}
 
-### Punishment history
-GET {{host}}/api/v1/bans/{{player}}/history?limit=20&offset=0
+### Active mutes, newest first
+GET {{host}}/api/v1/punishments?kind=MUTE&limit=20&offset=0
+X-Service-Token: {{token}}
+
+### Punishment history — bans, mutes and warnings together
+GET {{host}}/api/v1/punishments/{{player}}/history?limit=20&offset=0
 X-Service-Token: {{token}}
 
 ### Lift the ban
-DELETE {{host}}/api/v1/bans/{{player}}
+DELETE {{host}}/api/v1/punishments/{{player}}?kind=BAN
 X-Service-Token: {{token}}
 Content-Type: application/json
 
@@ -72,9 +108,24 @@ Content-Type: application/json
   "reason": "appeal accepted"
 }
 
+### Lift the mute
+DELETE {{host}}/api/v1/punishments/{{player}}?kind=MUTE
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "liftedByUuid": "{{admin}}",
+  "liftedByName": "Admin",
+  "reason": "cooled down"
+}
+
 ### Rejected: no token
-GET {{host}}/api/v1/bans/{{player}}/active
+GET {{host}}/api/v1/punishments/{{player}}/active
 
 ### Rejected: limit above the maximum
-GET {{host}}/api/v1/bans?limit=1000000
+GET {{host}}/api/v1/punishments?limit=1000000
+X-Service-Token: {{token}}
+
+### Rejected: unknown kind
+GET {{host}}/api/v1/punishments?kind=KICK
 X-Service-Token: {{token}}

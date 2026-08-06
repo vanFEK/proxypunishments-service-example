@@ -29,7 +29,7 @@ public record ApplicationProperties(
     public record Security(@NotBlank String serviceToken) {
     }
 
-    public record Cache(@NotNull Duration activeBanTtl, @NotNull Duration lookupTtl, long maxSize) {
+    public record Cache(@NotNull Duration activePunishmentTtl, @NotNull Duration lookupTtl, long maxSize) {
     }
 
     public record Remote(
@@ -39,8 +39,11 @@ public record ApplicationProperties(
     ) {
 
         public record Paths(
-                String activeBan, String issueBan, String liftBan,
-                String listBans, String history, String lookup
+                String activeBan, String issueBan,
+                String liftBan, String listBans,
+                String activeMute, String issueMute,
+                String liftMute, String listMutes,
+                String history, String lookup
         ) {
         }
 

@@ -38,7 +38,7 @@ proxybans:
     # silently disable authentication.
     service-token: ${PROXYBANS_SERVICE_TOKEN}
   cache:
-    active-ban-ttl: PT30S
+    active-punishment-ttl: PT30S
     lookup-ttl: PT10M
     max-size: 100000
   remote:
@@ -53,5 +53,11 @@ proxybans:
       issue-ban: ${PROXYBANS_REMOTE_PATH_ISSUE_BAN:/internal/game-bans}
       lift-ban: ${PROXYBANS_REMOTE_PATH_LIFT_BAN:/internal/game-bans/{0}/delete}
       list-bans: ${PROXYBANS_REMOTE_PATH_LIST_BANS:/internal/v1/bans}
+      # Blank by default: a backend that knows nothing about mutes leaves these unset and mute
+      # reads and writes degrade to empty instead of failing.
+      active-mute: ${PROXYBANS_REMOTE_PATH_ACTIVE_MUTE:}
+      issue-mute: ${PROXYBANS_REMOTE_PATH_ISSUE_MUTE:}
+      lift-mute: ${PROXYBANS_REMOTE_PATH_LIFT_MUTE:}
+      list-mutes: ${PROXYBANS_REMOTE_PATH_LIST_MUTES:}
       history: ${PROXYBANS_REMOTE_PATH_HISTORY:/internal/v1/punish-logs/{0}}
       lookup: ${PROXYBANS_REMOTE_PATH_LOOKUP:/internal/servers/user/{0}}

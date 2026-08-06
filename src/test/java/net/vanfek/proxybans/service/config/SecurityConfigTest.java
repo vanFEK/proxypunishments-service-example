@@ -43,7 +43,7 @@ class SecurityConfigTest {
 
     @Test
     void passesRequestsCarryingTheCorrectToken() {
-        MockServerWebExchange exchange = exchange("/api/v1/bans", TOKEN);
+        MockServerWebExchange exchange = exchange("/api/v1/punishments", TOKEN);
 
         this.filter.filter(exchange, this.chain).block();
 
@@ -52,7 +52,7 @@ class SecurityConfigTest {
 
     @Test
     void rejectsRequestsWithoutAToken() {
-        MockServerWebExchange exchange = exchange("/api/v1/bans", null);
+        MockServerWebExchange exchange = exchange("/api/v1/punishments", null);
 
         this.filter.filter(exchange, this.chain).block();
 
@@ -63,7 +63,7 @@ class SecurityConfigTest {
     @Test
     @DisplayName("an empty header does not match a configured token")
     void rejectsAnEmptyToken() {
-        MockServerWebExchange exchange = exchange("/api/v1/bans", "");
+        MockServerWebExchange exchange = exchange("/api/v1/punishments", "");
 
         this.filter.filter(exchange, this.chain).block();
 
@@ -73,7 +73,7 @@ class SecurityConfigTest {
 
     @Test
     void rejectsAWrongToken() {
-        MockServerWebExchange exchange = exchange("/api/v1/bans", "not-the-token");
+        MockServerWebExchange exchange = exchange("/api/v1/punishments", "not-the-token");
 
         this.filter.filter(exchange, this.chain).block();
 

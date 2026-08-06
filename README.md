@@ -6,7 +6,7 @@
 
 *[Русская версия](README.ru.md)*
 
-Reactive ban storage and lookup for Minecraft proxies. Serves the
+Reactive punishment storage and lookup for Minecraft proxies — bans, mutes and warnings. Serves the
 [ProxyBans Velocity plugin](https://github.com/vanfek/proxybans-plugin) over a small HTTP API.
 
 It runs in one of two modes, chosen by a single environment variable:
@@ -14,7 +14,7 @@ It runs in one of two modes, chosen by a single environment variable:
 | Mode     | Source of truth                | Use case                                      |
 |----------|--------------------------------|-----------------------------------------------|
 | `local`  | its own PostgreSQL schema      | standalone deployment, no external backend    |
-| `remote` | an existing HTTP API           | the bans already live in a website's database  |
+| `remote` | an existing HTTP API           | the punishments already live in a website's database |
 
 The plugin cannot tell the difference. That is the point of the architecture rather than a
 side effect of it.
@@ -29,7 +29,8 @@ docker compose up --build
 
 Then open <http://localhost:8080/swagger-ui.html> and send `X-Service-Token: dev-local-token`.
 [`docs/api.http`](docs/api.http) is a runnable request collection covering the whole flow —
-register a player, ban, inspect, unban — including the requests that are meant to be rejected.
+register a player, ban, mute, warn, inspect, lift — including the requests that are meant to be
+rejected.
 
 ## Architecture
 
@@ -38,19 +39,19 @@ Ports and adapters, with the domain in the middle and no framework types below t
 ```mermaid
 flowchart TB
     subgraph api["api/v1 — HTTP"]
-        BC[BansController]
+        BC[PunishmentsController]
         LC[LookupController]
         EH[ApiExceptionHandler]
     end
     subgraph domain["domain — no framework, no I/O"]
-        SVC[BanService + caches]
-        PORT1[[BanRepository]]
+        SVC[PunishmentService + caches]
+        PORT1[[PunishmentRepository]]
         PORT2[[UserResolver]]
     end
     subgraph adapters["adapters"]
-        L1[LocalBanRepository]
+        L1[LocalPunishmentRepository]
         L2[LocalUserResolver]
-        R1[RemoteBanRepository]
+        R1[RemotePunishmentRepository]
         R2[RemoteUserResolver]
     end
 
@@ -84,16 +85,21 @@ present only because Liquibase needs it at startup.
 Every endpoint except `/actuator/health` requires `X-Service-Token`.
 
 ```
-GET    /api/v1/bans?limit=&offset=              active bans, newest first
-GET    /api/v1/bans/{uuid}/active               the ban in force, or 404
-GET    /api/v1/bans/{uuid}/history?limit=&offset=   punishment log
-POST   /api/v1/bans                             issue a ban
-DELETE /api/v1/bans/{uuid}                      lift the active ban
-GET    /api/v1/lookup?name=<name>               resolve a name to a UUID
-POST   /api/v1/known-players                    record a UUID/name pair (local mode)
-GET    /actuator/health                         public
-GET    /swagger-ui.html                         interactive API docs
+GET    /api/v1/punishments?kind=&limit=&offset=            active punishments, newest first
+GET    /api/v1/punishments/{uuid}/active?kind=             the punishment in force, or 404
+GET    /api/v1/punishments/{uuid}/history?limit=&offset=   punishment log
+POST   /api/v1/punishments                                 issue a ban or a mute
+DELETE /api/v1/punishments/{uuid}?kind=                    lift the active punishment
+POST   /api/v1/warnings                                    record a warning
+GET    /api/v1/lookup?name=<name>                          resolve a name to a UUID
+POST   /api/v1/known-players                               record a UUID/name pair (local mode)
+GET    /actuator/health                                    public
+GET    /swagger-ui.html                                    interactive API docs
 ```
+
+`kind` is `BAN` or `MUTE` and defaults to `BAN` wherever it is accepted. A player can carry one
+active ban and one active mute at the same time; the two never shadow each other. A warning is
+log-only — it has no duration, no active state and nothing to lift.
 
 `limit` is capped at 100 and `offset` must not be negative — enforced in the service, not trusted
 from the caller.
@@ -112,9 +118,12 @@ from the caller.
 | `PROXYBANS_REMOTE_API_TOKEN`   | remote backend token                                      |
 | `PROXYBANS_REMOTE_TOKEN_HEADER`| header carrying that token, default `X-Server-Key`         |
 | `PROXYBANS_REMOTE_PATH_*`      | endpoint layout of the remote backend                     |
+| `PROXYBANS_REMOTE_PATH_*_MUTE` | mute endpoints; blank means the backend has none          |
 
 The service token has no default on purpose: an unset or blank token stops startup instead of
-silently accepting unauthenticated requests.
+silently accepting unauthenticated requests. The mute paths are blank by default instead: a backend
+that only knows about bans leaves them unset, and mute reads and writes degrade to empty results
+rather than failing.
 
 ## Security notes
 
@@ -128,14 +137,18 @@ silently accepting unauthenticated requests.
 
 Three tables in the `proxybans` schema, created by Liquibase:
 
-- `bans` — one row per punishment. A **partial unique index** on `player_uuid WHERE active = true`
-  makes "at most one active ban per player" a database guarantee rather than an application
-  convention; a concurrent double-ban surfaces as a conflict and is retried, not silently accepted.
-- `ban_history` — append-only punishment log, including unbans.
-- `known_players` — UUID ↔ name, so the ban list can show names instead of raw UUIDs.
+- `punishments` — one row per ban or mute, told apart by `kind`. A **partial unique index** on
+  `(player_uuid, kind) WHERE active = true` makes "at most one active punishment per player per
+  kind" a database guarantee rather than an application convention; a concurrent double-punishment
+  surfaces as a conflict and is retried, not silently accepted. Because `kind` is part of the key,
+  a mute never collides with that player's ban.
+- `ban_history` — append-only punishment log: `BAN`, `PERMBAN`, `UNBAN`, `MUTE`, `PERMMUTE`,
+  `UNMUTE` and `WARN`. Warnings live here and nowhere else.
+- `known_players` — UUID ↔ name, so the punishment list can show names instead of raw UUIDs.
 
-A scheduled sweeper deactivates expired temporary bans. Reads filter them out anyway; the sweeper
-exists so the partial index does not accumulate rows that no longer mean anything.
+A scheduled sweeper deactivates expired temporary punishments of both kinds. Reads filter them out
+anyway; the sweeper exists so the partial index does not accumulate rows that no longer mean
+anything.
 
 ## Tests
 
@@ -143,13 +156,15 @@ exists so the partial index does not accumulate rows that no longer mean anythin
 ./gradlew test
 ```
 
-- domain — caching, invalidation on issue/lift, case-insensitive name resolution, against
+- domain — caching keyed by player *and* kind, invalidation on issue/lift, bans and mutes side by
+  side, warnings that stay out of the active state, case-insensitive name resolution, against
   hand-written in-memory ports
 - HTTP — the full request path over `WebTestClient`: status codes, validation, JSON shape
 - security — the token filter: missing, empty, wrong and correct tokens; which actuator paths are
   public
 - integration — the local adapter against a real PostgreSQL via Testcontainers, covering the things
-  a fake cannot: `@Modifying` statements, the partial unique index, the name join
+  a fake cannot: `@Modifying` statements, the partial unique index on `(player_uuid, kind)`, the
+  name join
 
 Integration tests skip automatically where Docker is unavailable and always run in CI.
 

@@ -1,4 +1,4 @@
-package net.vanfek.proxybans.service.adapter.local.ban;
+package net.vanfek.proxybans.service.adapter.local.punishment;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,29 +11,29 @@ import java.time.Clock;
 // Exists to keep the partial unique index on active rows meaningful, not for read correctness.
 @Component
 @ConditionalOnProperty(name = "proxybans.mode", havingValue = "local")
-class ExpiredBanSweeper {
+class ExpiredPunishmentSweeper {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ExpiredBanSweeper.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ExpiredPunishmentSweeper.class);
     private static final long INTERVAL_MS = 300_000L;
 
-    private final BanRowRepository bans;
+    private final PunishmentRowRepository punishments;
     private final Clock clock;
 
-    ExpiredBanSweeper(BanRowRepository bans, Clock clock) {
-        this.bans = bans;
+    ExpiredPunishmentSweeper(PunishmentRowRepository punishments, Clock clock) {
+        this.punishments = punishments;
         this.clock = clock;
     }
 
     @Scheduled(fixedDelay = INTERVAL_MS, initialDelay = INTERVAL_MS)
     void sweep() {
-        this.bans.deactivateExpired(this.clock.instant())
+        this.punishments.deactivateExpired(this.clock.instant())
                 .subscribe(
                         deactivated -> {
                             if (deactivated > 0) {
-                                LOGGER.info("Deactivated {} expired ban(s)", deactivated);
+                                LOGGER.info("Deactivated {} expired punishment(s)", deactivated);
                             }
                         },
-                        error -> LOGGER.warn("Could not sweep expired bans: {}", error.getMessage(), error)
+                        error -> LOGGER.warn("Could not sweep expired punishments: {}", error.getMessage(), error)
                 );
     }
 

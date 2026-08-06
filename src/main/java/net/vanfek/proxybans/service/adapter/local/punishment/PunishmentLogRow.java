@@ -1,4 +1,4 @@
-package net.vanfek.proxybans.service.adapter.local.ban;
+package net.vanfek.proxybans.service.adapter.local.punishment;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;

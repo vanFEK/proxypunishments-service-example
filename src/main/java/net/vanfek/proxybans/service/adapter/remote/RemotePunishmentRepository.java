@@ -1,20 +1,22 @@
 package net.vanfek.proxybans.service.adapter.remote;
 
-import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.BanEnvelope;
-import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.BanListEnvelope;
-import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.BanPayload;
-import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.CreateBanRequest;
+import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.CreatePunishmentRequest;
 import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.HistoryEnvelope;
 import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.HistoryPayload;
-import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.LiftBanRequest;
+import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.LiftPunishmentRequest;
 import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.Party;
+import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.PunishmentEnvelope;
+import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.PunishmentListEnvelope;
+import net.vanfek.proxybans.service.adapter.remote.RemotePayloads.PunishmentPayload;
 import net.vanfek.proxybans.service.config.ApplicationProperties;
-import net.vanfek.proxybans.service.domain.model.ActiveBan;
+import net.vanfek.proxybans.service.domain.model.ActivePunishment;
 import net.vanfek.proxybans.service.domain.model.BanType;
-import net.vanfek.proxybans.service.domain.model.IssueBanCommand;
-import net.vanfek.proxybans.service.domain.model.LiftBanCommand;
+import net.vanfek.proxybans.service.domain.model.IssuePunishmentCommand;
+import net.vanfek.proxybans.service.domain.model.IssueWarningCommand;
+import net.vanfek.proxybans.service.domain.model.LiftPunishmentCommand;
+import net.vanfek.proxybans.service.domain.model.PunishmentKind;
 import net.vanfek.proxybans.service.domain.model.PunishmentLogEntry;
-import net.vanfek.proxybans.service.domain.port.BanRepository;
+import net.vanfek.proxybans.service.domain.port.PunishmentRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
@@ -32,7 +34,7 @@ import java.util.UUID;
 
 @Repository
 @ConditionalOnProperty(name = "proxybans.mode", havingValue = "remote")
-class RemoteBanRepository implements BanRepository {
+class RemotePunishmentRepository implements PunishmentRepository {
 
     private static final int TYPE_TEMPORARY = 0;
     private static final UUID NIL_UUID = new UUID(0L, 0L);
@@ -42,29 +44,41 @@ class RemoteBanRepository implements BanRepository {
     private final ApplicationProperties.Remote.Paths paths;
     private final Clock clock;
 
-    RemoteBanRepository(WebClient remoteWebClient, ApplicationProperties properties, Clock clock) {
+    RemotePunishmentRepository(WebClient remoteWebClient, ApplicationProperties properties, Clock clock) {
         this.client = remoteWebClient;
         this.paths = properties.remote().paths();
         this.clock = clock;
     }
 
     @Override
-    public Mono<ActiveBan> findActive(UUID playerUuid) {
+    public Mono<ActivePunishment> findActive(UUID playerUuid, PunishmentKind kind) {
+        Optional<String> path = pathFor(kind, this.paths.activeBan(), this.paths.activeMute());
+
+        if (path.isEmpty()) {
+            return Mono.empty();
+        }
+
         return this.client.get()
-                .uri(this.paths.activeBan(), playerUuid)
+                .uri(path.get(), playerUuid)
                 .retrieve()
-                .bodyToMono(BanEnvelope.class)
-                .mapNotNull(BanEnvelope::data)
+                .bodyToMono(PunishmentEnvelope.class)
+                .mapNotNull(PunishmentEnvelope::data)
                 .filter(this::isActive)
-                .map(RemoteBanRepository::toDomain)
-                .onErrorResume(RemoteBanRepository::isMissing, ignored -> Mono.empty());
+                .map(payload -> toDomain(payload, kind))
+                .onErrorResume(RemotePunishmentRepository::isMissing, ignored -> Mono.empty());
     }
 
     @Override
-    public Mono<ActiveBan> issue(IssueBanCommand command) {
+    public Mono<ActivePunishment> issue(IssuePunishmentCommand command) {
+        Optional<String> path = pathFor(command.kind(), this.paths.issueBan(), this.paths.issueMute());
+
+        if (path.isEmpty()) {
+            return Mono.empty();
+        }
+
         Instant now = this.clock.instant();
 
-        CreateBanRequest payload = new CreateBanRequest(
+        CreatePunishmentRequest payload = new CreatePunishmentRequest(
                 command.playerUuid().toString(),
                 command.issuedByUuid().toString(), command.issuedByName(),
                 command.reason(),
@@ -72,22 +86,28 @@ class RemoteBanRepository implements BanRepository {
         );
 
         return this.client.post()
-                .uri(this.paths.issueBan())
+                .uri(path.get())
                 .bodyValue(payload)
                 .retrieve()
-                .bodyToMono(BanEnvelope.class)
-                .mapNotNull(BanEnvelope::data)
-                .map(RemoteBanRepository::toDomain);
+                .bodyToMono(PunishmentEnvelope.class)
+                .mapNotNull(PunishmentEnvelope::data)
+                .map(body -> toDomain(body, command.kind()));
     }
 
     @Override
-    public Mono<Void> lift(LiftBanCommand command) {
-        LiftBanRequest payload = new LiftBanRequest(
+    public Mono<Void> lift(LiftPunishmentCommand command) {
+        Optional<String> path = pathFor(command.kind(), this.paths.liftBan(), this.paths.liftMute());
+
+        if (path.isEmpty()) {
+            return Mono.empty();
+        }
+
+        LiftPunishmentRequest payload = new LiftPunishmentRequest(
                 command.liftedByUuid().toString(), command.liftedByName(), command.reason()
         );
 
         return this.client.post()
-                .uri(this.paths.liftBan(), command.playerUuid())
+                .uri(path.get(), command.playerUuid())
                 .bodyValue(payload)
                 .retrieve()
                 .toBodilessEntity()
@@ -95,19 +115,30 @@ class RemoteBanRepository implements BanRepository {
     }
 
     @Override
-    public Flux<ActiveBan> listActive(int limit, int offset) {
+    public Mono<PunishmentLogEntry> warn(IssueWarningCommand command) {
+        return Mono.empty();
+    }
+
+    @Override
+    public Flux<ActivePunishment> listActive(PunishmentKind kind, int limit, int offset) {
+        Optional<String> path = pathFor(kind, this.paths.listBans(), this.paths.listMutes());
+
+        if (path.isEmpty()) {
+            return Flux.empty();
+        }
+
         return this.client.get()
-                .uri(builder -> builder.path(this.paths.listBans())
+                .uri(builder -> builder.path(path.get())
                         .queryParam("limit", limit)
                         .queryParam("offset", offset)
                         .build())
                 .retrieve()
-                .bodyToMono(BanListEnvelope.class)
+                .bodyToMono(PunishmentListEnvelope.class)
                 .map(envelope -> Optional.ofNullable(envelope.data()).orElseGet(List::of))
                 .flatMapMany(Flux::fromIterable)
                 .filter(this::isActive)
-                .map(RemoteBanRepository::toDomain)
-                .onErrorResume(RemoteBanRepository::isMissing, ignored -> Flux.empty());
+                .map(payload -> toDomain(payload, kind))
+                .onErrorResume(RemotePunishmentRepository::isMissing, ignored -> Flux.empty());
     }
 
     @Override
@@ -121,11 +152,18 @@ class RemoteBanRepository implements BanRepository {
                 .bodyToMono(HistoryEnvelope.class)
                 .map(envelope -> Optional.ofNullable(envelope.data()).orElseGet(List::of))
                 .flatMapMany(Flux::fromIterable)
-                .map(RemoteBanRepository::toDomain)
-                .onErrorResume(RemoteBanRepository::isMissing, ignored -> Flux.empty());
+                .map(RemotePunishmentRepository::toDomain)
+                .onErrorResume(RemotePunishmentRepository::isMissing, ignored -> Flux.empty());
     }
 
-    private boolean isActive(BanPayload payload) {
+    // An unconfigured path is how a ban-only backend says "no such thing here"; callers then see nothing at all.
+    private Optional<String> pathFor(PunishmentKind kind, String banPath, String mutePath) {
+        String path = kind == PunishmentKind.MUTE ? mutePath : banPath;
+
+        return path == null || path.isBlank() ? Optional.empty() : Optional.of(path);
+    }
+
+    private boolean isActive(PunishmentPayload payload) {
         if (payload == null) {
             return false;
         }
@@ -139,11 +177,11 @@ class RemoteBanRepository implements BanRepository {
         return end == null || end == 0L || Instant.ofEpochSecond(end).isAfter(this.clock.instant());
     }
 
-    private static boolean isPermanent(BanPayload payload) {
+    private static boolean isPermanent(PunishmentPayload payload) {
         return payload.type() != null && payload.type() != TYPE_TEMPORARY;
     }
 
-    private static ActiveBan toDomain(BanPayload payload) {
+    private static ActivePunishment toDomain(PunishmentPayload payload, PunishmentKind kind) {
         boolean permanent = isPermanent(payload);
 
         Optional<Instant> expiresAt = permanent || payload.timeEnd() == null || payload.timeEnd() == 0L
@@ -153,9 +191,10 @@ class RemoteBanRepository implements BanRepository {
         Party banned = payload.banned();
         Party punisher = payload.punisher();
 
-        return new ActiveBan(
+        return new ActivePunishment(
                 payload.id() != null ? payload.id() : 0L,
                 parseUuidOrNil(banned != null ? banned.uuid() : null), Optional.ofNullable(banned != null ? banned.login() : null),
+                kind,
                 parseUuidOrNil(punisher != null ? punisher.uuid() : null), loginOrDefault(punisher),
                 payload.reason() != null ? payload.reason() : "",
                 Instant.ofEpochSecond(payload.timeStart() != null ? payload.timeStart() : 0L), expiresAt,

@@ -5,7 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
-import net.vanfek.proxybans.service.domain.model.ActiveBan;
+import net.vanfek.proxybans.service.domain.model.ActivePunishment;
+import net.vanfek.proxybans.service.domain.model.PunishmentKind;
 import net.vanfek.proxybans.service.domain.model.PunishmentLogEntry;
 import net.vanfek.proxybans.service.domain.model.UserIdentity;
 
@@ -13,21 +14,28 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-final class BanDtos {
+final class PunishmentDtos {
 
-    private BanDtos() {
+    private PunishmentDtos() {
     }
 
-    record IssueBanRequest(
-            @NotNull UUID playerUuid,
+    record IssuePunishmentRequest(
+            @NotNull UUID playerUuid, @NotNull PunishmentKind kind,
             @NotNull UUID issuedByUuid, @NotBlank @Size(max = 64) String issuedByName,
             @NotBlank @Size(max = 255) String reason, @Positive Long durationSeconds
     ) {
     }
 
-    record LiftBanRequest(
+    record LiftPunishmentRequest(
             @NotNull UUID liftedByUuid, @NotBlank @Size(max = 64) String liftedByName,
             @Size(max = 255) String reason
+    ) {
+    }
+
+    record IssueWarningRequest(
+            @NotNull UUID playerUuid,
+            @NotNull UUID issuedByUuid, @NotBlank @Size(max = 64) String issuedByName,
+            @NotBlank @Size(max = 255) String reason
     ) {
     }
 
@@ -40,21 +48,23 @@ final class BanDtos {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    record ActiveBanResponse(
+    record ActivePunishmentResponse(
             long id, UUID playerUuid, String playerName,
+            String kind,
             UUID issuedByUuid, String issuedByName,
             String reason,
             Instant issuedAt, Instant expiresAt,
             String type
     ) {
 
-        static ActiveBanResponse from(ActiveBan ban) {
-            return new ActiveBanResponse(
-                    ban.id(), ban.playerUuid(), ban.playerName().orElse(null),
-                    ban.issuedByUuid(), ban.issuedByName(),
-                    ban.reason(),
-                    ban.issuedAt(), ban.expiresAt().orElse(null),
-                    ban.type().name()
+        static ActivePunishmentResponse from(ActivePunishment punishment) {
+            return new ActivePunishmentResponse(
+                    punishment.id(), punishment.playerUuid(), punishment.playerName().orElse(null),
+                    punishment.kind().name(),
+                    punishment.issuedByUuid(), punishment.issuedByName(),
+                    punishment.reason(),
+                    punishment.issuedAt(), punishment.expiresAt().orElse(null),
+                    punishment.type().name()
             );
         }
 
@@ -80,7 +90,7 @@ final class BanDtos {
     record HistoryResponse(List<HistoryEntryResponse> data) {
     }
 
-    record ActiveBansListResponse(List<ActiveBanResponse> data) {
+    record ActivePunishmentsListResponse(List<ActivePunishmentResponse> data) {
     }
 
     record LookupResponse(UUID uuid, String login) {

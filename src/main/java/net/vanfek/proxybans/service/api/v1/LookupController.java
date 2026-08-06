@@ -5,9 +5,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import net.vanfek.proxybans.service.api.v1.BanDtos.LookupResponse;
-import net.vanfek.proxybans.service.api.v1.BanDtos.RememberRequest;
-import net.vanfek.proxybans.service.domain.service.BanService;
+import net.vanfek.proxybans.service.api.v1.PunishmentDtos.LookupResponse;
+import net.vanfek.proxybans.service.api.v1.PunishmentDtos.RememberRequest;
+import net.vanfek.proxybans.service.domain.service.PunishmentService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,16 +24,16 @@ import reactor.core.publisher.Mono;
 @Tag(name = "Players", description = "Resolving names to UUIDs")
 class LookupController {
 
-    private final BanService bans;
+    private final PunishmentService punishments;
 
-    LookupController(BanService bans) {
-        this.bans = bans;
+    LookupController(PunishmentService punishments) {
+        this.punishments = punishments;
     }
 
     @GetMapping("/lookup")
     @Operation(summary = "Resolve a player name to a UUID, or 404")
     Mono<ResponseEntity<LookupResponse>> lookup(@RequestParam @NotBlank @Size(max = 32) String name) {
-        return this.bans.resolveByLogin(name)
+        return this.punishments.resolveByLogin(name)
                 .map(identity -> identity
                         .map(LookupResponse::from)
                         .map(ResponseEntity::ok)
@@ -43,7 +43,7 @@ class LookupController {
     @PostMapping("/known-players")
     @Operation(summary = "Record a UUID/name pair seen on the proxy (local mode only)")
     Mono<ResponseEntity<Void>> remember(@Valid @RequestBody RememberRequest request) {
-        return this.bans.remember(request.toIdentity()).thenReturn(ResponseEntity.noContent().build());
+        return this.punishments.remember(request.toIdentity()).thenReturn(ResponseEntity.noContent().build());
     }
 
 }

@@ -11,11 +11,11 @@ final class RemotePayloads {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record BanEnvelope(@JsonProperty("data") BanPayload data) {
+    record PunishmentEnvelope(@JsonProperty("data") PunishmentPayload data) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record BanListEnvelope(@JsonProperty("data") List<BanPayload> data) {
+    record PunishmentListEnvelope(@JsonProperty("data") List<PunishmentPayload> data) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -23,7 +23,7 @@ final class RemotePayloads {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record BanPayload(
+    record PunishmentPayload(
             @JsonProperty("id") Long id, @JsonProperty("reason") String reason,
             @JsonProperty("time_start") Long timeStart, @JsonProperty("time_end") Long timeEnd,
             @JsonProperty("type") Integer type,
@@ -47,14 +47,14 @@ final class RemotePayloads {
     record IdentityPayload(@JsonProperty("uuid") String uuid, @JsonProperty("login") String login) {
     }
 
-    record CreateBanRequest(
+    record CreatePunishmentRequest(
             @JsonProperty("banned_uuid") String bannedUuid,
             @JsonProperty("punisher_uuid") String punisherUuid, @JsonProperty("punisher_login") String punisherLogin,
             @JsonProperty("reason") String reason, @JsonProperty("expired_at") Long expiredAt
     ) {
     }
 
-    record LiftBanRequest(
+    record LiftPunishmentRequest(
             @JsonProperty("lifted_by_uuid") String liftedByUuid, @JsonProperty("lifted_by_login") String liftedByLogin,
             @JsonProperty("reason") String reason
     ) {

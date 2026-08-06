@@ -1,11 +1,13 @@
-package net.vanfek.proxybans.service.adapter.local.ban;
+package net.vanfek.proxybans.service.adapter.local.punishment;
 
-import net.vanfek.proxybans.service.domain.model.ActiveBan;
+import net.vanfek.proxybans.service.domain.model.ActivePunishment;
 import net.vanfek.proxybans.service.domain.model.BanType;
-import net.vanfek.proxybans.service.domain.model.IssueBanCommand;
-import net.vanfek.proxybans.service.domain.model.LiftBanCommand;
+import net.vanfek.proxybans.service.domain.model.IssuePunishmentCommand;
+import net.vanfek.proxybans.service.domain.model.IssueWarningCommand;
+import net.vanfek.proxybans.service.domain.model.LiftPunishmentCommand;
+import net.vanfek.proxybans.service.domain.model.PunishmentKind;
 import net.vanfek.proxybans.service.domain.model.PunishmentLogEntry;
-import net.vanfek.proxybans.service.domain.port.BanRepository;
+import net.vanfek.proxybans.service.domain.port.PunishmentRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
@@ -21,74 +23,87 @@ import java.util.UUID;
 
 @Repository
 @ConditionalOnProperty(name = "proxybans.mode", havingValue = "local")
-class LocalBanRepository implements BanRepository {
+class LocalPunishmentRepository implements PunishmentRepository {
 
-    private final BanRowRepository bans;
+    private final PunishmentRowRepository punishments;
     private final PunishmentLogRowRepository logs;
     private final TransactionalOperator transactions;
     private final Clock clock;
 
-    LocalBanRepository(
-            BanRowRepository bans, PunishmentLogRowRepository logs,
+    LocalPunishmentRepository(
+            PunishmentRowRepository punishments, PunishmentLogRowRepository logs,
             TransactionalOperator transactions, Clock clock
     ) {
-        this.bans = bans;
+        this.punishments = punishments;
         this.logs = logs;
         this.transactions = transactions;
         this.clock = clock;
     }
 
     @Override
-    public Mono<ActiveBan> findActive(UUID playerUuid) {
+    public Mono<ActivePunishment> findActive(UUID playerUuid, PunishmentKind kind) {
         Instant now = this.clock.instant();
 
-        return this.bans.findActiveByPlayerUuid(playerUuid)
+        return this.punishments.findActiveByPlayerUuidAndKind(playerUuid, kind.name())
                 .filter(row -> row.permanent() || row.expiresAt() == null || row.expiresAt().isAfter(now))
-                .map(LocalBanRepository::toDomain);
+                .map(LocalPunishmentRepository::toDomain);
     }
 
-    // The partial unique index turns a concurrent double-ban into a constraint violation, hence the retry.
+    // The partial unique index turns a concurrent double-punishment into a constraint violation, hence the retry.
     @Override
-    public Mono<ActiveBan> issue(IssueBanCommand command) {
+    public Mono<ActivePunishment> issue(IssuePunishmentCommand command) {
         return issueOnce(command)
                 .retryWhen(Retry.max(1).filter(DataIntegrityViolationException.class::isInstance))
                 .as(this.transactions::transactional);
     }
 
     @Override
-    public Mono<Void> lift(LiftBanCommand command) {
+    public Mono<Void> lift(LiftPunishmentCommand command) {
         Instant now = this.clock.instant();
 
         PunishmentLogRow logEntry = new PunishmentLogRow(
                 null, command.playerUuid(),
                 command.liftedByUuid(), command.liftedByName(),
-                PunishmentLogEntry.PunishmentAction.UNBAN.name(), command.reason(),
+                command.kind().liftedAction().name(), command.reason(),
                 now, null
         );
 
-        return this.bans.deactivateAllFor(command.playerUuid())
+        return this.punishments.deactivateAllFor(command.playerUuid(), command.kind().name())
                 .then(this.logs.save(logEntry))
                 .then()
                 .as(this.transactions::transactional);
     }
 
     @Override
-    public Flux<PunishmentLogEntry> history(UUID playerUuid, int limit, int offset) {
-        return this.logs.historyFor(playerUuid, limit, offset).map(LocalBanRepository::toDomain);
+    public Mono<PunishmentLogEntry> warn(IssueWarningCommand command) {
+        PunishmentLogRow logEntry = new PunishmentLogRow(
+                null, command.playerUuid(),
+                command.issuedByUuid(), command.issuedByName(),
+                PunishmentLogEntry.PunishmentAction.WARN.name(), command.reason(),
+                this.clock.instant(), null
+        );
+
+        return this.logs.save(logEntry).map(LocalPunishmentRepository::toDomain);
     }
 
     @Override
-    public Flux<ActiveBan> listActive(int limit, int offset) {
-        return this.bans.listActive(this.clock.instant(), limit, offset).map(LocalBanRepository::toDomain);
+    public Flux<PunishmentLogEntry> history(UUID playerUuid, int limit, int offset) {
+        return this.logs.historyFor(playerUuid, limit, offset).map(LocalPunishmentRepository::toDomain);
     }
 
-    private Mono<ActiveBan> issueOnce(IssueBanCommand command) {
+    @Override
+    public Flux<ActivePunishment> listActive(PunishmentKind kind, int limit, int offset) {
+        return this.punishments.listActive(kind.name(), this.clock.instant(), limit, offset)
+                .map(LocalPunishmentRepository::toDomain);
+    }
+
+    private Mono<ActivePunishment> issueOnce(IssuePunishmentCommand command) {
         Instant now = this.clock.instant();
         Instant expiresAt = command.duration().map(now::plus).orElse(null);
         boolean permanent = command.isPermanent();
 
-        BanRow row = new BanRow(
-                null, command.playerUuid(),
+        PunishmentRow row = new PunishmentRow(
+                null, command.playerUuid(), command.kind().name(),
                 command.issuedByUuid(), command.issuedByName(),
                 command.reason(),
                 now, expiresAt,
@@ -98,25 +113,20 @@ class LocalBanRepository implements BanRepository {
         PunishmentLogRow logEntry = new PunishmentLogRow(
                 null, command.playerUuid(),
                 command.issuedByUuid(), command.issuedByName(),
-                actionOf(permanent), command.reason(),
+                command.kind().issuedAction(permanent).name(), command.reason(),
                 now, expiresAt
         );
 
-        return this.bans.deactivateAllFor(command.playerUuid())
-                .then(this.bans.save(row))
+        return this.punishments.deactivateAllFor(command.playerUuid(), command.kind().name())
+                .then(this.punishments.save(row))
                 .flatMap(saved -> this.logs.save(logEntry).thenReturn(saved))
-                .map(LocalBanRepository::toDomain);
+                .map(LocalPunishmentRepository::toDomain);
     }
 
-    private static String actionOf(boolean permanent) {
-        return permanent
-                ? PunishmentLogEntry.PunishmentAction.PERMBAN.name()
-                : PunishmentLogEntry.PunishmentAction.BAN.name();
-    }
-
-    private static ActiveBan toDomain(BanRow row) {
-        return new ActiveBan(
+    private static ActivePunishment toDomain(PunishmentRow row) {
+        return new ActivePunishment(
                 row.id(), row.playerUuid(), Optional.empty(),
+                PunishmentKind.valueOf(row.kind()),
                 row.issuedByUuid(), row.issuedByName(),
                 row.reason(),
                 row.issuedAt(), Optional.ofNullable(row.expiresAt()),
@@ -124,9 +134,10 @@ class LocalBanRepository implements BanRepository {
         );
     }
 
-    private static ActiveBan toDomain(BanWithNameRow row) {
-        return new ActiveBan(
+    private static ActivePunishment toDomain(PunishmentWithNameRow row) {
+        return new ActivePunishment(
                 row.id(), row.playerUuid(), Optional.ofNullable(row.playerName()),
+                PunishmentKind.valueOf(row.kind()),
                 row.issuedByUuid(), row.issuedByName(),
                 row.reason(),
                 row.issuedAt(), Optional.ofNullable(row.expiresAt()),

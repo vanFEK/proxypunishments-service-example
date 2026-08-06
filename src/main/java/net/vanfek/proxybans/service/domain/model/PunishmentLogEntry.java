@@ -14,7 +14,11 @@ public record PunishmentLogEntry(
 
         BAN,
         PERMBAN,
-        UNBAN
+        UNBAN,
+        MUTE,
+        PERMMUTE,
+        UNMUTE,
+        WARN
 
     }
 

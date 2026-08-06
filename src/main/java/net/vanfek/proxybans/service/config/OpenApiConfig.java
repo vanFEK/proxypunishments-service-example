@@ -24,7 +24,7 @@ class OpenApiConfig {
         Info info = new Info()
                 .title("ProxyBans Service API")
                 .version("v1")
-                .description("Ban storage and lookup for Minecraft proxies. Every endpoint except "
+                .description("Punishment storage and lookup for Minecraft proxies. Every endpoint except "
                         + "/actuator/health requires the X-Service-Token header.");
 
         return new OpenAPI()
