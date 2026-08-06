@@ -6,7 +6,7 @@
                             https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
 
     <changeSet id="0004-create-known-players" author="vanfek">
-        <createTable tableName="known_players" schemaName="proxybans">
+        <createTable tableName="known_players" schemaName="proxypunishments">
             <column name="uuid" type="uuid">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
@@ -22,7 +22,7 @@
         </createTable>
 
         <createIndex tableName="known_players" indexName="idx_known_players_login_lower"
-                     schemaName="proxybans" unique="true">
+                     schemaName="proxypunishments" unique="true">
             <column name="login_lower"/>
         </createIndex>
     </changeSet>

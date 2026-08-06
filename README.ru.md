@@ -1,13 +1,13 @@
-# ProxyBans — сервис
+# ProxyPunishments — сервис
 
-[![CI](https://github.com/vanfek/proxybans-service/actions/workflows/ci.yml/badge.svg)](https://github.com/vanfek/proxybans-service/actions/workflows/ci.yml)
+[![CI](https://github.com/vanfek/proxypunishments-service/actions/workflows/ci.yml/badge.svg)](https://github.com/vanfek/proxypunishments-service/actions/workflows/ci.yml)
 [![Java](https://img.shields.io/badge/Java-25-orange)](https://openjdk.org/projects/jdk/25/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0-brightgreen)](https://spring.io/projects/spring-boot)
 
 *[English version](README.md)*
 
 Реактивное хранилище наказаний для Minecraft-прокси — баны, муты и предупреждения. Обслуживает
-[плагин ProxyBans для Velocity](https://github.com/vanfek/proxybans-plugin) по небольшому HTTP API.
+[плагин ProxyPunishments для Velocity](https://github.com/vanfek/proxypunishments-plugin) по небольшому HTTP API.
 
 Работает в одном из двух режимов, переключается одной переменной окружения:
 
@@ -107,17 +107,17 @@ GET    /swagger-ui.html                                    интерактив�
 
 | Переменная                      | Назначение                                              |
 |---------------------------------|---------------------------------------------------------|
-| `PROXYBANS_MODE`                | `local` или `remote`                                    |
-| `PROXYBANS_SERVICE_TOKEN`       | общий секрет для `X-Service-Token`; **без дефолта**     |
+| `PROXYPUNISHMENTS_MODE`                | `local` или `remote`                                    |
+| `PROXYPUNISHMENTS_SERVICE_TOKEN`       | общий секрет для `X-Service-Token`; **без дефолта**     |
 | `SPRING_PROFILES_ACTIVE`        | `local` или `remote`                                    |
-| `SPRING_R2DBC_URL`              | `r2dbc:postgresql://host:5432/proxybans`                |
+| `SPRING_R2DBC_URL`              | `r2dbc:postgresql://host:5432/proxypunishments`                |
 | `SPRING_R2DBC_USERNAME/PASSWORD`| доступ к БД                                             |
 | `SPRING_LIQUIBASE_URL/USER/PASSWORD` | то же по JDBC, только для миграций                 |
-| `PROXYBANS_REMOTE_BASE_URL`     | базовый URL внешнего бэкенда (режим `remote`)           |
-| `PROXYBANS_REMOTE_API_TOKEN`    | токен внешнего бэкенда                                  |
-| `PROXYBANS_REMOTE_TOKEN_HEADER` | заголовок для него, по умолчанию `X-Server-Key`         |
-| `PROXYBANS_REMOTE_PATH_*`       | раскладка эндпоинтов внешнего бэкенда                   |
-| `PROXYBANS_REMOTE_PATH_*_MUTE`  | эндпоинты мутов; пусто — их у бэкенда нет               |
+| `PROXYPUNISHMENTS_REMOTE_BASE_URL`     | базовый URL внешнего бэкенда (режим `remote`)           |
+| `PROXYPUNISHMENTS_REMOTE_API_TOKEN`    | токен внешнего бэкенда                                  |
+| `PROXYPUNISHMENTS_REMOTE_TOKEN_HEADER` | заголовок для него, по умолчанию `X-Server-Key`         |
+| `PROXYPUNISHMENTS_REMOTE_PATH_*`       | раскладка эндпоинтов внешнего бэкенда                   |
+| `PROXYPUNISHMENTS_REMOTE_PATH_*_MUTE`  | эндпоинты мутов; пусто — их у бэкенда нет               |
 
 У токена нет значения по умолчанию намеренно: пустой или незаданный токен останавливает запуск,
 а не превращается в тихий приём неаутентифицированных запросов. У путей для мутов, наоборот, дефолт
@@ -134,7 +134,7 @@ GET    /swagger-ui.html                                    интерактив�
 
 ## Модель данных
 
-Три таблицы в схеме `proxybans`, создаются Liquibase:
+Три таблицы в схеме `proxypunishments`, создаются Liquibase:
 
 - `punishments` — строка на бан или мут, различаются по `kind`. **Частичный уникальный индекс** по
   `(player_uuid, kind) WHERE active = true` делает «не больше одного активного наказания на игрока
@@ -167,7 +167,7 @@ GET    /swagger-ui.html                                    интерактив�
 ## Сборка
 
 ```bash
-./gradlew bootJar        # build/libs/proxybans-service-1.0.0.jar
+./gradlew bootJar        # build/libs/proxypunishments-service-1.0.0.jar
 ```
 
 Нужен JDK 25. Gradle wrapper закоммичен.

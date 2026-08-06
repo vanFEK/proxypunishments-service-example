@@ -1,4 +1,4 @@
-### ProxyBans service — runnable request collection.
+### ProxyPunishments service — runnable request collection.
 ### Works in IntelliJ IDEA and in VS Code with the REST Client extension.
 ### Start the stack first: docker compose up --build
 

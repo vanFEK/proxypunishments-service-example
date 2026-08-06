@@ -1,1 +1,1 @@
-rootProject.name = "proxybans-service"
+rootProject.name = "proxypunishments-service"

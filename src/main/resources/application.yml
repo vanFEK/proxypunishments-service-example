@@ -1,13 +1,13 @@
 spring:
   application:
-    name: proxybans-service
+    name: proxypunishments-service
   liquibase:
     change-log: classpath:db/changelog/master.xml
-    default-schema: proxybans
-    liquibase-schema: proxybans
+    default-schema: proxypunishments
+    liquibase-schema: proxypunishments
   r2dbc:
     properties:
-      schema: proxybans
+      schema: proxypunishments
     pool:
       initial-size: 4
       max-size: 32
@@ -31,33 +31,33 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-proxybans:
-  mode: ${PROXYBANS_MODE:local}
+proxypunishments:
+  mode: ${PROXYPUNISHMENTS_MODE:local}
   security:
     # No default on purpose: an unset token must stop the service from starting rather than
     # silently disable authentication.
-    service-token: ${PROXYBANS_SERVICE_TOKEN}
+    service-token: ${PROXYPUNISHMENTS_SERVICE_TOKEN}
   cache:
     active-punishment-ttl: PT30S
     lookup-ttl: PT10M
     max-size: 100000
   remote:
-    base-url: ${PROXYBANS_REMOTE_BASE_URL:}
-    api-token: ${PROXYBANS_REMOTE_API_TOKEN:}
-    token-header: ${PROXYBANS_REMOTE_TOKEN_HEADER:X-Server-Key}
+    base-url: ${PROXYPUNISHMENTS_REMOTE_BASE_URL:}
+    api-token: ${PROXYPUNISHMENTS_REMOTE_API_TOKEN:}
+    token-header: ${PROXYPUNISHMENTS_REMOTE_TOKEN_HEADER:X-Server-Key}
     connect-timeout: PT2S
     read-timeout: PT3S
     # Endpoint layout of the backend being fronted. {0} is the player UUID or name.
     paths:
-      active-ban: ${PROXYBANS_REMOTE_PATH_ACTIVE_BAN:/internal/game-bans/{0}}
-      issue-ban: ${PROXYBANS_REMOTE_PATH_ISSUE_BAN:/internal/game-bans}
-      lift-ban: ${PROXYBANS_REMOTE_PATH_LIFT_BAN:/internal/game-bans/{0}/delete}
-      list-bans: ${PROXYBANS_REMOTE_PATH_LIST_BANS:/internal/v1/bans}
+      active-ban: ${PROXYPUNISHMENTS_REMOTE_PATH_ACTIVE_BAN:/internal/game-bans/{0}}
+      issue-ban: ${PROXYPUNISHMENTS_REMOTE_PATH_ISSUE_BAN:/internal/game-bans}
+      lift-ban: ${PROXYPUNISHMENTS_REMOTE_PATH_LIFT_BAN:/internal/game-bans/{0}/delete}
+      list-bans: ${PROXYPUNISHMENTS_REMOTE_PATH_LIST_BANS:/internal/v1/bans}
       # Blank by default: a backend that knows nothing about mutes leaves these unset and mute
       # reads and writes degrade to empty instead of failing.
-      active-mute: ${PROXYBANS_REMOTE_PATH_ACTIVE_MUTE:}
-      issue-mute: ${PROXYBANS_REMOTE_PATH_ISSUE_MUTE:}
-      lift-mute: ${PROXYBANS_REMOTE_PATH_LIFT_MUTE:}
-      list-mutes: ${PROXYBANS_REMOTE_PATH_LIST_MUTES:}
-      history: ${PROXYBANS_REMOTE_PATH_HISTORY:/internal/v1/punish-logs/{0}}
-      lookup: ${PROXYBANS_REMOTE_PATH_LOOKUP:/internal/servers/user/{0}}
+      active-mute: ${PROXYPUNISHMENTS_REMOTE_PATH_ACTIVE_MUTE:}
+      issue-mute: ${PROXYPUNISHMENTS_REMOTE_PATH_ISSUE_MUTE:}
+      lift-mute: ${PROXYPUNISHMENTS_REMOTE_PATH_LIFT_MUTE:}
+      list-mutes: ${PROXYPUNISHMENTS_REMOTE_PATH_LIST_MUTES:}
+      history: ${PROXYPUNISHMENTS_REMOTE_PATH_HISTORY:/internal/v1/punish-logs/{0}}
+      lookup: ${PROXYPUNISHMENTS_REMOTE_PATH_LOOKUP:/internal/servers/user/{0}}

@@ -1,6 +1,6 @@
-proxybans:
+proxypunishments:
   mode: remote
 
 logging:
   level:
-    net.vanfek.proxybans: INFO
+    net.vanfek.proxypunishments: INFO

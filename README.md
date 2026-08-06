@@ -1,13 +1,13 @@
-# ProxyBans — service
+# ProxyPunishments — service
 
-[![CI](https://github.com/vanfek/proxybans-service/actions/workflows/ci.yml/badge.svg)](https://github.com/vanfek/proxybans-service/actions/workflows/ci.yml)
+[![CI](https://github.com/vanfek/proxypunishments-service/actions/workflows/ci.yml/badge.svg)](https://github.com/vanfek/proxypunishments-service/actions/workflows/ci.yml)
 [![Java](https://img.shields.io/badge/Java-25-orange)](https://openjdk.org/projects/jdk/25/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0-brightgreen)](https://spring.io/projects/spring-boot)
 
 *[Русская версия](README.ru.md)*
 
 Reactive punishment storage and lookup for Minecraft proxies — bans, mutes and warnings. Serves the
-[ProxyBans Velocity plugin](https://github.com/vanfek/proxybans-plugin) over a small HTTP API.
+[ProxyPunishments Velocity plugin](https://github.com/vanfek/proxypunishments-plugin) over a small HTTP API.
 
 It runs in one of two modes, chosen by a single environment variable:
 
@@ -108,17 +108,17 @@ from the caller.
 
 | Variable                       | Purpose                                                   |
 |--------------------------------|-----------------------------------------------------------|
-| `PROXYBANS_MODE`               | `local` or `remote`                                       |
-| `PROXYBANS_SERVICE_TOKEN`      | shared secret for `X-Service-Token`; **no default**       |
+| `PROXYPUNISHMENTS_MODE`               | `local` or `remote`                                       |
+| `PROXYPUNISHMENTS_SERVICE_TOKEN`      | shared secret for `X-Service-Token`; **no default**       |
 | `SPRING_PROFILES_ACTIVE`       | `local` or `remote`                                       |
-| `SPRING_R2DBC_URL`             | `r2dbc:postgresql://host:5432/proxybans`                  |
+| `SPRING_R2DBC_URL`             | `r2dbc:postgresql://host:5432/proxypunishments`                  |
 | `SPRING_R2DBC_USERNAME/PASSWORD` | database credentials                                    |
 | `SPRING_LIQUIBASE_URL/USER/PASSWORD` | JDBC equivalents, used for migrations only          |
-| `PROXYBANS_REMOTE_BASE_URL`    | remote backend base URL (`remote` mode)                   |
-| `PROXYBANS_REMOTE_API_TOKEN`   | remote backend token                                      |
-| `PROXYBANS_REMOTE_TOKEN_HEADER`| header carrying that token, default `X-Server-Key`         |
-| `PROXYBANS_REMOTE_PATH_*`      | endpoint layout of the remote backend                     |
-| `PROXYBANS_REMOTE_PATH_*_MUTE` | mute endpoints; blank means the backend has none          |
+| `PROXYPUNISHMENTS_REMOTE_BASE_URL`    | remote backend base URL (`remote` mode)                   |
+| `PROXYPUNISHMENTS_REMOTE_API_TOKEN`   | remote backend token                                      |
+| `PROXYPUNISHMENTS_REMOTE_TOKEN_HEADER`| header carrying that token, default `X-Server-Key`         |
+| `PROXYPUNISHMENTS_REMOTE_PATH_*`      | endpoint layout of the remote backend                     |
+| `PROXYPUNISHMENTS_REMOTE_PATH_*_MUTE` | mute endpoints; blank means the backend has none          |
 
 The service token has no default on purpose: an unset or blank token stops startup instead of
 silently accepting unauthenticated requests. The mute paths are blank by default instead: a backend
@@ -135,7 +135,7 @@ rather than failing.
 
 ## Data model
 
-Three tables in the `proxybans` schema, created by Liquibase:
+Three tables in the `proxypunishments` schema, created by Liquibase:
 
 - `punishments` — one row per ban or mute, told apart by `kind`. A **partial unique index** on
   `(player_uuid, kind) WHERE active = true` makes "at most one active punishment per player per
@@ -171,7 +171,7 @@ Integration tests skip automatically where Docker is unavailable and always run 
 ## Building
 
 ```bash
-./gradlew bootJar        # build/libs/proxybans-service-1.0.0.jar
+./gradlew bootJar        # build/libs/proxypunishments-service-1.0.0.jar
 ```
 
 Requires JDK 25. The Gradle wrapper is committed.

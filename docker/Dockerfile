@@ -16,12 +16,12 @@ RUN gradle --no-daemon bootJar -x test
 FROM eclipse-temurin:25-jre-alpine AS runtime
 
 # Runs unprivileged: a compromised process should not own the container.
-RUN addgroup -S proxybans && adduser -S -G proxybans proxybans
+RUN addgroup -S proxypunishments && adduser -S -G proxypunishments proxypunishments
 
 WORKDIR /app
-COPY --from=build --chown=proxybans:proxybans /workspace/build/libs/*.jar app.jar
+COPY --from=build --chown=proxypunishments:proxypunishments /workspace/build/libs/*.jar app.jar
 
-USER proxybans
+USER proxypunishments
 EXPOSE 8080
 
 HEALTHCHECK --interval=15s --timeout=3s --start-period=40s --retries=5 \

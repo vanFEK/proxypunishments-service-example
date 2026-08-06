@@ -1,7 +1,7 @@
-proxybans:
+proxypunishments:
   mode: local
 
 logging:
   level:
-    net.vanfek.proxybans: DEBUG
+    net.vanfek.proxypunishments: DEBUG
     org.springframework.r2dbc: INFO

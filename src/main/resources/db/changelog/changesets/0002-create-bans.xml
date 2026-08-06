@@ -6,7 +6,7 @@
                             https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
 
     <changeSet id="0002-create-bans" author="vanfek">
-        <createTable tableName="bans" schemaName="proxybans">
+        <createTable tableName="bans" schemaName="proxypunishments">
             <column name="id" type="bigserial">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
@@ -36,9 +36,9 @@
 
         <!-- At most one active ban per player, enforced by the database rather than by application
              logic that two concurrent requests could both pass. -->
-        <sql>CREATE UNIQUE INDEX idx_bans_active_player ON proxybans.bans(player_uuid) WHERE active = true</sql>
+        <sql>CREATE UNIQUE INDEX idx_bans_active_player ON proxypunishments.bans(player_uuid) WHERE active = true</sql>
 
         <!-- Supports the expiry sweeper, which only ever scans active, non-permanent rows. -->
-        <sql>CREATE INDEX idx_bans_expiry ON proxybans.bans(expires_at) WHERE active = true AND permanent = false</sql>
+        <sql>CREATE INDEX idx_bans_expiry ON proxypunishments.bans(expires_at) WHERE active = true AND permanent = false</sql>
     </changeSet>
 </databaseChangeLog>

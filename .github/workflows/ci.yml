@@ -43,8 +43,8 @@ jobs:
       - name: Upload jar
         uses: actions/upload-artifact@v4
         with:
-          name: proxybans-service
-          path: build/libs/proxybans-service-*.jar
+          name: proxypunishments-service
+          path: build/libs/proxypunishments-service-*.jar
           retention-days: 7
 
   docker:
@@ -55,4 +55,4 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build image
-        run: docker build -f docker/Dockerfile -t proxybans-service:ci .
+        run: docker build -f docker/Dockerfile -t proxypunishments-service:ci .

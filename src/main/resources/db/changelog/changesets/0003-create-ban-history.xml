@@ -6,7 +6,7 @@
                             https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
 
     <changeSet id="0003-create-ban-history" author="vanfek">
-        <createTable tableName="ban_history" schemaName="proxybans">
+        <createTable tableName="ban_history" schemaName="proxypunishments">
             <column name="id" type="bigserial">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
@@ -29,7 +29,7 @@
             <column name="expires_at" type="timestamptz"/>
         </createTable>
 
-        <createIndex tableName="ban_history" indexName="idx_ban_history_player" schemaName="proxybans">
+        <createIndex tableName="ban_history" indexName="idx_ban_history_player" schemaName="proxypunishments">
             <column name="player_uuid"/>
             <column name="happened_at" descending="true"/>
         </createIndex>

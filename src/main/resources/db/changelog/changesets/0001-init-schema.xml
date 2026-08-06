@@ -6,6 +6,6 @@
                             https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
 
     <changeSet id="0001-init-schema" author="vanfek">
-        <sql>CREATE SCHEMA IF NOT EXISTS proxybans</sql>
+        <sql>CREATE SCHEMA IF NOT EXISTS proxypunishments</sql>
     </changeSet>
 </databaseChangeLog>

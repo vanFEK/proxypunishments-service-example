@@ -6,24 +6,24 @@
                             https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
 
     <changeSet id="0005-punishments" author="vanfek">
-        <renameTable oldTableName="bans" newTableName="punishments" schemaName="proxybans"/>
+        <renameTable oldTableName="bans" newTableName="punishments" schemaName="proxypunishments"/>
 
-        <addColumn tableName="punishments" schemaName="proxybans">
+        <addColumn tableName="punishments" schemaName="proxypunishments">
             <column name="kind" type="varchar(8)" defaultValue="BAN">
                 <constraints nullable="false"/>
             </column>
         </addColumn>
 
         <!-- Postgres carries indexes across a table rename under their old names, so both are dropped by name. -->
-        <sql>DROP INDEX proxybans.idx_bans_active_player</sql>
-        <sql>DROP INDEX proxybans.idx_bans_expiry</sql>
+        <sql>DROP INDEX proxypunishments.idx_bans_active_player</sql>
+        <sql>DROP INDEX proxypunishments.idx_bans_expiry</sql>
 
         <!-- At most one active punishment per player *per kind*: a mute must not collide with a ban. -->
-        <sql>CREATE UNIQUE INDEX idx_punishments_active ON proxybans.punishments(player_uuid, kind) WHERE active = true</sql>
+        <sql>CREATE UNIQUE INDEX idx_punishments_active ON proxypunishments.punishments(player_uuid, kind) WHERE active = true</sql>
 
         <!-- Supports the expiry sweeper, which only ever scans active, non-permanent rows of either kind. -->
-        <sql>CREATE INDEX idx_punishments_expiry ON proxybans.punishments(expires_at) WHERE active = true AND permanent = false</sql>
+        <sql>CREATE INDEX idx_punishments_expiry ON proxypunishments.punishments(expires_at) WHERE active = true AND permanent = false</sql>
 
-        <modifyDataType tableName="ban_history" columnName="action" newDataType="varchar(16)" schemaName="proxybans"/>
+        <modifyDataType tableName="ban_history" columnName="action" newDataType="varchar(16)" schemaName="proxypunishments"/>
     </changeSet>
 </databaseChangeLog>

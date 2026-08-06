@@ -5,9 +5,9 @@ services:
   postgres:
     image: postgres:18-alpine
     environment:
-      POSTGRES_DB: proxybans
-      POSTGRES_USER: proxybans
-      POSTGRES_PASSWORD: proxybans
+      POSTGRES_DB: proxypunishments
+      POSTGRES_USER: proxypunishments
+      POSTGRES_PASSWORD: proxypunishments
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -15,12 +15,12 @@ services:
     # Without this the service starts before Postgres accepts connections and Liquibase
     # fails on the very first `docker compose up`.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U proxybans -d proxybans"]
+      test: ["CMD-SHELL", "pg_isready -U proxypunishments -d proxypunishments"]
       interval: 5s
       timeout: 3s
       retries: 10
 
-  proxybans:
+  proxypunishments:
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -29,14 +29,14 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: local
-      PROXYBANS_MODE: local
-      PROXYBANS_SERVICE_TOKEN: dev-local-token
-      SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/proxybans
-      SPRING_R2DBC_USERNAME: proxybans
-      SPRING_R2DBC_PASSWORD: proxybans
-      SPRING_LIQUIBASE_URL: jdbc:postgresql://postgres:5432/proxybans
-      SPRING_LIQUIBASE_USER: proxybans
-      SPRING_LIQUIBASE_PASSWORD: proxybans
+      PROXYPUNISHMENTS_MODE: local
+      PROXYPUNISHMENTS_SERVICE_TOKEN: dev-local-token
+      SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/proxypunishments
+      SPRING_R2DBC_USERNAME: proxypunishments
+      SPRING_R2DBC_PASSWORD: proxypunishments
+      SPRING_LIQUIBASE_URL: jdbc:postgresql://postgres:5432/proxypunishments
+      SPRING_LIQUIBASE_USER: proxypunishments
+      SPRING_LIQUIBASE_PASSWORD: proxypunishments
     ports:
       - "127.0.0.1:8080:8080"
 
